@@ -123,7 +123,8 @@ def main(degree  = 2,
             if method == 'goal':
                 indicators = {'Indicators':goal_indicators.indicators,'Internal':goal_inter.indicators,'Boundary':goal_bound.indicators}
                 plotter.plot_indicators(method+'_indicators'+str(nref),domain, geom, indicators)
-                plotter.plot_solution('dualsolution'+str(nref),domain, geom, ns.z)
+                plotter.plot_solution('dualsolution'+str(nref),dualspace, geom, ns.z)
+                plotter.plot_solution('dualsolutionprojection'+str(nref),dualspace, geom, ns.z-ns.Iz)
                 domain = refiner.refine(domain, goal_indicators, num)
 
             if method == 'uniform':
@@ -242,6 +243,8 @@ def elem_errors_goal(ns, geom, domain, dualspace, degree):
     bound_indicators = bound_indicators.goaloriented(dualspace.boundary['patch1-right'], gbound2, 'boundary')
     bound_indicators = bound_indicators.goaloriented(dualspace.boundary['patch0-right'], gbound3, 'boundary')
     bound_indicators = bound_indicators.goaloriented(dualspace.boundary['patch0-bottom'], gbound4, 'boundary')
+
+    goal_indicators = goal_indicators.abs()
 
     return goal_indicators, int_indicators, bound_indicators
  
