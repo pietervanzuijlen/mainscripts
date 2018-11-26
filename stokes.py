@@ -14,22 +14,27 @@ from utilities import indicater
 from utilities import anouncer
 from utilities import refiner
 
+import treelog
+
 def main(
          degree:  'polynomial degree for velocity'  = 3,
          mu:      'viscosity'                       = 1.,
-         maxref:  'number of refinement iterations' = 10,
-         maxuref: 'maximum uniform refinements'     = 3,
+         maxref:  'number of refinement iterations' = 20,
+         maxuref: 'maximum uniform refinements'     = 2,
          M1:      'position of central circle'      = .4,
          write:   'write results to file'           = True,
          npoints: 'number of sample points'         = 5,
-         num:     'to be refined fraction'          = 0.4,
+         num:     'to be refined fraction'          = 20,
          uref:    'number of uniform refinements'   = 2,
          ):
 
-    methods = ['residual','goal','uniform']
-    methods = ['goal']
+  datalog = treelog.DataLog('results/images/stokes')
 
-    for mid in [0.4]:
+  methods = ['residual','goal','uniform']
+
+  with treelog.add(datalog):
+
+    for mid in [0.5,0.4,0.35]:
 
         for method in methods:
     
@@ -40,12 +45,13 @@ def main(
             ns.x = geom
             ns.pbar = 1
             
+            maxlvl       = []
             residual     = []
             sum_residual = []
             sum_goal     = []
             nelems       = []
     
-            for nref in log.range('Refinement step', maxref):
+            for nref in range(maxref):
     
                 # Primal problem
     
@@ -94,9 +100,12 @@ def main(
     
     
                 res = dualspace.integral('(( mu (v_i,j + v_j,i) - q δ_ij ) z_i,j - s v_i,i ) d:x' @ ns, degree=degree*2).derivative('dualtest')
+                # outflow
                 res += dualspace.boundary['left'].integral('( -v_i n_i ) d:x' @ ns, degree=degree*2).derivative('dualtest')
-                #res += dualspace.boundary['right'].integral('( v_i n_i ) d:x' @ ns, degree=degree*2).derivative('dualtest')
-                #res += dualspace.boundary['right'].integral('( q ) d:x' @ ns, degree=degree*2).derivative('dualtest')
+                # drag coefficient
+                #res += dualspace.boundary['circle'].integral(' n_i (mu (v_i,j + v_j,i) - q δ_ij) <1 , 0>_j d:x' @ ns, degree=degree*2).derivative('dualtest')
+                # lift coefficient
+                #res += dualspace.boundary['circle'].integral(' n_i (mu (v_i,j + v_j,i) - q δ_ij) <0 , 1>_j d:x' @ ns, degree=degree*2).derivative('dualtest')
     
                 dualtrail = solver.solve_linear('dualtrail', res, constrain=cons)
     
@@ -115,6 +124,11 @@ def main(
                 #residual_indicators = func_errors_residual(ns, geom, domain, degree) 
                 #goal_indicators = func_errors_goal(ns, geom, domain, dualspace, degree) 
     
+                try:
+                    maxlvl   += [domain.levels]
+                except:
+                    maxlvl   += [1]
+
                 residual     += [domain.integrate(function.norm2('(-mu (u_i,jj + u_j,ij) + p_,i) d:x' @ns)+function.abs('u_i,i d:x' @ns), ischeme='gauss5')]
                 sum_residual += [sum(residual_indicators.indicators.values())]
                 sum_goal     += [sum(goal_indicators.indicators.values())]
@@ -129,8 +143,6 @@ def main(
                     indicators = {'Indicators':goal_indicators.indicators,'Internal':goal_inter.indicators,'Boundary':goal_inflow.indicators}
                     plotter.plot_indicators(method+'_indicators'+str(nref),domain, geom, indicators)
                     domain = refiner.refine(domain, goal_indicators, num)
-                    plotter.plot_streamlines('dualvector_projected'+str(nref), dualspace, geom, ns, ns.z-ns.Iz)
-                    plotter.plot_solution('dualscalar_projected'+str(nref), dualspace, geom, ns.s-ns.Is)
                     
                 if method == 'uniform':
                     domain = domain.refine(1)
@@ -138,22 +150,21 @@ def main(
                         break
     
     
-                plotter.plot_mesh('mesh_'+method+str(nref)+str(mid),domain,geom)
+                plotter.plot_mesh('mesh_'+method+str(mid)+'_'+str(nref),domain,geom)
         
             if write:
                 writer.write('results/stokes'+method+str(mid),
                             {'degree': degree, 'nref': maxref, 'refinement number': num},
+                              maxlvl       = maxlvl,
                               residual     = residual,
                               sum_residual = sum_residual,
                               sum_goal     = sum_goal,
                               nelems       = nelems,)
     
-        plotter.plot_streamlines('velocity'+str(mid), domain, geom, ns, ns.u)
-        plotter.plot_solution('pressure'+str(mid), domain, geom, ns.p)
-        plotter.plot_streamlines('dualvector'+str(mid), dualspace, geom, ns, ns.z)
-        plotter.plot_solution('dualscalar'+str(mid), dualspace, geom, ns.s)
-
-    #anouncer.drum()
+        plotter.plot_streamlines('velocity'+method+str(mid), domain, geom, ns, ns.u)
+        plotter.plot_solution('pressure'+method+str(mid), domain, geom, ns.p)
+        plotter.plot_streamlines('dualvector'+method+str(mid), dualspace, geom, ns, ns.z)
+        plotter.plot_solution('dualscalar'+method+str(mid), dualspace, geom, ns.s)
 
 def func_errors_residual(ns, geom, domain, degree):
 
