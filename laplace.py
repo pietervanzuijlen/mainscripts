@@ -19,14 +19,14 @@ def main(degree  = 2,
          poi     = [0,0],
          maxref  = 15,
          maxuref = 3,
-         write   = True,
+         write   = False,
          npoints = 5,
          num     = 8,
          uref    = 1,): 
 
   datalog = treelog.DataLog('../results/images/laplace')
+
   methods = ['residual','goal','uniform']
-  methods = ['goal']
 
   with treelog.add(datalog):
 
@@ -81,11 +81,12 @@ def main(degree  = 2,
             dualspace = domain.refine(1)
             ns.dualbasis = dualspace.basis('th-spline', degree=degree)
     
-            amp  = 200 
+            amp  = 0.1 
             dx   = poi[0] 
             dy   = poi[1] 
     
-            ns.q = (1+function.tanh(amp*(x-dx))) *(1+function.tanh(amp*(dx-x)))*(1+function.tanh(amp*(y-dy)))*(1+function.tanh(amp*(dy-y)))
+            #ns.q = (1+function.tanh(amp*(x-dx))) *(1+function.tanh(amp*(dx-x)))*(1+function.tanh(amp*(y-dy)))*(1+function.tanh(amp*(dy-y)))
+            ns.q = function.exp(-((x-dx)**2+(y-dy)**2)/(2*amp**2))
             B = dualspace.integrate(ns.eval_ij('dualbasis_i,k dualbasis_j,k d:x'), ischeme = 'gauss5')
             Q = dualspace.integrate(ns.eval_i('q dualbasis_i d:x'), ischeme='gauss5')
             
@@ -124,6 +125,7 @@ def main(degree  = 2,
                 indicators = {'Indicators':goal_indicators.indicators,'Internal':goal_inter.indicators,'Boundary':goal_bound.indicators}
                 plotter.plot_indicators(method+'_indicators'+str(nref),domain, geom, indicators)
                 plotter.plot_solution('dualsolution'+str(nref),dualspace, geom, ns.z)
+                plotter.plot_solution('qoi'+str(nref),dualspace, geom, ns.q)
                 plotter.plot_solution('dualsolutionprojection'+str(nref),dualspace, geom, ns.z-ns.Iz)
                 domain = refiner.refine(domain, goal_indicators, num)
 
