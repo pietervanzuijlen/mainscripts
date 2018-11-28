@@ -28,7 +28,7 @@ def main(
          uref:    'number of uniform refinements'   = 2,
          ):
 
-  datalog = treelog.DataLog('results/images/stokes')
+  datalog = treelog.DataLog('../results/images/stokes')
 
   methods = ['residual','goal','uniform']
 
@@ -153,7 +153,7 @@ def main(
                 plotter.plot_mesh('mesh_'+method+str(mid)+'_'+str(nref),domain,geom)
         
             if write:
-                writer.write('results/stokes'+method+str(mid),
+                writer.write('../results/stokes'+method+str(mid),
                             {'degree': degree, 'nref': maxref, 'refinement number': num},
                               maxlvl       = maxlvl,
                               residual     = residual,

@@ -22,21 +22,21 @@ def main(case = 'stokes',):
         goal = []
         error= []
     
-        text = writer.read('results/'+case+methods[0]+str(M1))
+        text = writer.read('../results/'+case+methods[0]+str(M1))
     
         resid_residual     = text['residual'] 
         resid_sum_residual = text['sum_residual'] 
         resid_sum_goal     = text['sum_goal']    
         resid_nelems       = text['nelems']      
     
-        text = writer.read('results/'+case+methods[1]+str(M1))
+        text = writer.read('../results/'+case+methods[1]+str(M1))
     
         goal_residual     = text['residual'] 
         goal_sum_residual = text['sum_residual'] 
         goal_sum_goal     = text['sum_goal']    
         goal_nelems       = text['nelems']      
     
-        text = writer.read('results/'+case+methods[2]+str(M1))
+        text = writer.read('../results/'+case+methods[2]+str(M1))
     
         unif_residual     = text['residual'] 
         unif_sum_residual = text['sum_residual'] 

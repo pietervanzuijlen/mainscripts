@@ -24,7 +24,7 @@ def main(degree  = 2,
          num     = 8,
          uref    = 1,): 
 
-  datalog = treelog.DataLog('results/images/laplace')
+  datalog = treelog.DataLog('../results/images/laplace')
   methods = ['residual','goal','uniform']
   methods = ['goal']
 
@@ -81,7 +81,7 @@ def main(degree  = 2,
             dualspace = domain.refine(1)
             ns.dualbasis = dualspace.basis('th-spline', degree=degree)
     
-            amp  = 20 
+            amp  = 200 
             dx   = poi[0] 
             dy   = poi[1] 
     
@@ -137,7 +137,7 @@ def main(degree  = 2,
         plotter.plot_mesh('mesh_'+method,domain,geom)
 
         if write:
-            writer.write('results/lshape'+method+poitype,
+            writer.write('../results/lshape'+method+poitype,
                         {'degree': degree, 'nref': maxref, 'poi': poi},
                           error_exact  = error_exact,
                           error_qoi    = error_qoi,

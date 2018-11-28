@@ -18,7 +18,7 @@ def main(case = 'lshape',):
     goal = []
     error= []
 
-    text = writer.read('results/'+case+methods[0]+poitype)
+    text = writer.read('../results/'+case+methods[0]+poitype)
 
     resid_error_exact = text['error_exact']   
     resid_error_qoi   = text['error_qoi']   
@@ -27,7 +27,7 @@ def main(case = 'lshape',):
     resid_sum_goal    = text['sum_goal']    
     resid_nelems      = text['nelems']      
 
-    text = writer.read('results/'+case+methods[1]+poitype)
+    text = writer.read('../results/'+case+methods[1]+poitype)
 
     goal_error_exact = text['error_exact']   
     goal_error_qoi   = text['error_qoi']   
@@ -36,7 +36,7 @@ def main(case = 'lshape',):
     goal_sum_goal    = text['sum_goal']    
     goal_nelems      = text['nelems']      
 
-    text = writer.read('results/'+case+methods[2]+poitype)
+    text = writer.read('../results/'+case+methods[2]+poitype)
 
     unif_error_exact = text['error_exact']   
     unif_error_qoi   = text['error_qoi']   
