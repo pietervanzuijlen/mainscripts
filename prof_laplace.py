@@ -14,17 +14,18 @@ from utilities import refiner
 
 import treelog
 
+@profile
 def main(degree  = 2,
          poitype = 'center',
          poi     = [0,0],
-         maxref  = 20,
-         maxuref = 2,
+         maxref  = 2,
+         maxuref = 4,
          write   = True,
          npoints = 5,
-         num     = 40,
-         uref    = 3,): 
+         num     = 20,
+         uref    = 2,): 
 
-  datalog = treelog.DataLog('../results/laplace/images')
+  datalog = treelog.DataLog('../results/images/laplace')
 
   methods = ['residual','goal','uniform']
 
@@ -121,13 +122,15 @@ def main(degree  = 2,
             if method == 'residual':
                 indicators = {'Indicators':residual_indicators.indicators,'Internal':res_int.indicators,'Interfaces':res_jump.indicators,'Boundary':res_bound.indicators}
                 plotter.plot_indicators(method+'_indicators'+str(nref),domain, geom, indicators)
-                domain = refiner.refine(domain, residual_indicators, num, maxlevel=8)
+                domain = refiner.refine(domain, residual_indicators, num, maxlevel=5)
 
             if method == 'goal':
                 indicators = {'Indicators':goal_indicators.indicators,'Internal':goal_inter.indicators,'Boundary':goal_bound.indicators}
                 plotter.plot_indicators(method+'_indicators'+str(nref),domain, geom, indicators)
+                plotter.plot_solution('dualsolution'+str(nref),dualspace, geom, ns.z)
+                plotter.plot_solution('qoi'+str(nref),dualspace, geom, ns.q)
                 plotter.plot_solution('dualsolutionprojection'+str(nref),dualspace, geom, ns.z-ns.Iz)
-                domain = refiner.refine(domain, goal_indicators, num, maxlevel=8)
+                domain = refiner.refine(domain, goal_indicators, num, maxlevel=5)
 
             if method == 'uniform':
                 domain = domain.refine(1)
@@ -149,6 +152,8 @@ def main(degree  = 2,
                           sum_goal     = sum_goal,
                           nelems       = nelems,)
 
+
+@profile
 def func_errors_residual(ns, geom, domain, dualspace, degree):
 
     indicators = indicater.functionbased(domain, geom, ns.basis, degree)
@@ -159,6 +164,7 @@ def func_errors_residual(ns, geom, domain, dualspace, degree):
 
     return indicators
 
+@profile
 def func_errors_goal(ns, geom, domain, dualspace, degree):
 
     indicators = indicater.functionbased(dualspace, geom, ns.basis, degree)
@@ -177,6 +183,7 @@ def func_errors_goal(ns, geom, domain, dualspace, degree):
 
     return indicators
 
+@profile
 def elem_errors_residual(ns, geom, domain, dualspace, degree):
 
     # Residual-based error terms
@@ -215,7 +222,8 @@ def elem_errors_residual(ns, geom, domain, dualspace, degree):
     bound_indicators = bound_indicators.residualbased(domain.boundary['patch0-bottom'], rbound4, 'boundary')
 
     return residual_indicators, int_indicators, jump_indicators, bound_indicators
- 
+
+@profile
 def elem_errors_goal(ns, geom, domain, dualspace, degree):
 
     ns.gint    = '- uh_,i (z_,i - Iz_,i)'

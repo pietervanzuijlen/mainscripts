@@ -27,11 +27,11 @@ def main(
          uref:    'number of uniform refinements'   = 0,
          ):
 
-  datalog = treelog.DataLog('../results/images/channels')
+        datalog = treelog.DataLog('../results/images/channels')
+      
+        methods = ['residual','goal','uniform']
 
-  methods = ['residual','goal','uniform']
-
-  with treelog.add(datalog):
+#  with treelog.add(datalog):
 
         for method in methods:
     

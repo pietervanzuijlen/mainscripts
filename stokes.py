@@ -19,7 +19,7 @@ import treelog
 def main(
          degree:  'polynomial degree for velocity'  = 3,
          mu:      'viscosity'                       = 1.,
-         maxref:  'number of refinement iterations' = 20,
+         maxref:  'number of refinement iterations' = ,
          maxuref: 'maximum uniform refinements'     = 2,
          M1:      'position of central circle'      = .4,
          write:   'write results to file'           = True,
@@ -28,7 +28,7 @@ def main(
          uref:    'number of uniform refinements'   = 2,
          ):
 
-  datalog = treelog.DataLog('../results/images/stokes')
+  datalog = treelog.DataLog('../results/stokes/images')
 
   methods = ['residual','goal','uniform']
 
