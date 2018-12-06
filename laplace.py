@@ -17,12 +17,12 @@ import treelog
 def main(degree  = 2,
          poitype = 'center',
          poi     = [0,0],
-         maxref  = 20,
+         maxref  = 4,
          maxuref = 2,
          write   = True,
          npoints = 5,
-         num     = 40,
-         uref    = 3,): 
+         num     = 10,
+         uref    = 2,): 
 
   datalog = treelog.DataLog('../results/laplace/images')
 
@@ -108,7 +108,7 @@ def main(degree  = 2,
             #goal_indicators = func_errors_goal(ns, geom, domain, dualspace, degree) 
 
             try:
-                maxlvl   += [domain.levels]
+                maxlvl   += [len(domain.levels)]
             except:
                 maxlvl   += [1]
             error_exact  += [domain.integrate(function.abs('(u - uh) d:x' @ns), ischeme='gauss5')]
@@ -251,5 +251,5 @@ def elem_errors_goal(ns, geom, domain, dualspace, degree):
 
     return goal_indicators, int_indicators, bound_indicators
  
-
-cli.run(main)
+with config(verbose=3,nprocs=6):
+    cli.run(main)

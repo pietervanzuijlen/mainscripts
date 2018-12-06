@@ -19,22 +19,21 @@ import treelog
 def main(
          degree:  'polynomial degree for velocity'  = 3,
          mu:      'viscosity'                       = 1.,
-         maxref:  'number of refinement iterations' = ,
-         maxuref: 'maximum uniform refinements'     = 2,
-         M1:      'position of central circle'      = .4,
+         maxref:  'number of refinement iterations' = 30,
+         maxuref: 'maximum uniform refinements'     = 3,
+         M1:      'position of central circle'      = .35,
          write:   'write results to file'           = True,
          npoints: 'number of sample points'         = 5,
-         num:     'to be refined fraction'          = 20,
+         num:     'to be refined fraction'          = 85,
          uref:    'number of uniform refinements'   = 2,
          ):
 
+  mid = M1
   datalog = treelog.DataLog('../results/stokes/images')
 
   methods = ['residual','goal','uniform']
 
   with treelog.add(datalog):
-
-    for mid in [0.5,0.4,0.35]:
 
         for method in methods:
     
@@ -126,7 +125,7 @@ def main(
     
                 # Building lists with error data
                 try:
-                    maxlvl   += [domain.levels]
+                    maxlvl   += [len(domain.levels)]
                 except:
                     maxlvl   += [1]
                 residual     += [domain.integrate(function.norm2('(-mu (u_i,jj + u_j,ij) + p_,i) d:x' @ns)+function.abs('u_i,i d:x' @ns), ischeme='gauss5')]
@@ -254,5 +253,8 @@ def elem_errors_goal(ns, geom, domain, dualspace, degree):
     goal_indicators = goal_indicators.abs()
 
     return goal_indicators, inter_indicators, inflow_indicators
+
  
-cli.run(main)
+with config(verbose=3,nprocs=6):
+    cli.run(main)
+

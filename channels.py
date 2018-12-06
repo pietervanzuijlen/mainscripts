@@ -123,7 +123,7 @@ def main(
     
                 # Building lists with error data
                 try:
-                    maxlvl   += [domain.levels]
+                    maxlvl   += [len(domain.levels)]
                 except:
                     maxlvl   += [1]
                 residual     += [domain.integrate(function.norm2('(-mu (u_i,jj + u_j,ij) + p_,i) d:x' @ns)+function.abs('u_i,i d:x' @ns), ischeme='gauss5')]
@@ -254,4 +254,6 @@ def elem_errors_goal(ns, geom, domain, dualspace, degree):
 
     return goal_indicators, inter_indicators, inflow_indicators
  
-cli.run(main)
+with config(verbose=3,nprocs=6):
+    cli.run(main)
+
