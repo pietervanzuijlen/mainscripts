@@ -24,12 +24,13 @@ def main(
          write:   'write results to file'           = False,
          npoints: 'number of sample points'         = 5,
          num:     'to be refined fraction'          = 20,
-         uref:    'number of uniform refinements'   = 0,
+         uref:    'number of uniform refinements'   = 2,
          ):
 
         datalog = treelog.DataLog('../results/images/channels')
       
         methods = ['residual','goal','uniform']
+        methods = ['uniform']
 
 #  with treelog.add(datalog):
 
@@ -135,12 +136,12 @@ def main(
                 # Refining and plotting 
                 if method == 'residual':
                     indicators = {'Indicators':residual_indicators.indicators,'Internal':res_int.indicators,'Interfaces':res_jump.indicators,'Boundary':res_bound.indicators}
-                    plotter.plot_indicators(method+'_indicators'+str(nref),domain, geom, indicators)
+                    #plotter.plot_indicators(method+'_indicators'+str(nref),domain, geom, indicators)
                     domain = refiner.refine(domain, residual_indicators, num)
                     
                 if method == 'goal':
                     indicators = {'Indicators':goal_indicators.indicators,'Internal':goal_inter.indicators,'Boundary':goal_inflow.indicators}
-                    plotter.plot_indicators(method+'_indicators'+str(nref),domain, geom, indicators)
+                    #plotter.plot_indicators(method+'_indicators'+str(nref),domain, geom, indicators)
                     domain = refiner.refine(domain, goal_indicators, num)
                     
                 if method == 'uniform':
@@ -148,7 +149,7 @@ def main(
                     if nref == maxuref:
                         break
     
-                plotter.plot_mesh('mesh_'+method+'_'+str(nref),domain,geom)
+                #plotter.plot_mesh('mesh_'+method+'_'+str(nref),domain,geom)
         
             if write:
                 writer.write('../results/channels/stokes'+method,
@@ -160,9 +161,9 @@ def main(
                               nelems       = nelems,)
     
         plotter.plot_streamlines('velocity'+method, domain, geom, ns, ns.u)
-        plotter.plot_solution('pressure'+method, domain, geom, ns.p)
-        plotter.plot_streamlines('dualvector'+method, dualspace, geom, ns, ns.z)
-        plotter.plot_solution('dualscalar'+method, dualspace, geom, ns.s)
+        #plotter.plot_solution('pressure'+method, domain, geom, ns.p)
+        #plotter.plot_streamlines('dualvector'+method, dualspace, geom, ns, ns.z)
+        #plotter.plot_solution('dualscalar'+method, dualspace, geom, ns.s)
 
         anouncer.drum()
 

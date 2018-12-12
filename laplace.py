@@ -15,14 +15,12 @@ from utilities import refiner
 import treelog
 
 def main(degree  = 2,
-         poitype = 'center',
-         poi     = [0,0],
-         maxref  = 4,
+         maxref  = 20,
          maxuref = 2,
          write   = True,
          npoints = 5,
          num     = 10,
-         uref    = 2,): 
+         uref    = 3,): 
 
   datalog = treelog.DataLog('../results/laplace/images')
 
@@ -30,7 +28,7 @@ def main(degree  = 2,
 
   with treelog.add(datalog):
 
-   for poi, poitype in zip([[0,0],[.5,-.5]],['center','corner']):
+   for poi, poitype in zip([[0,0],[.5,-.5],[.5,.5]],['center','corner','top']):
 
     for method in methods:
 
@@ -44,8 +42,9 @@ def main(degree  = 2,
         sum_goal     = []
         maxlvl       = []
         nelems       = []
+        ndofs        = []
     
-        for nref in log.range('Refinement step: ', maxref):
+        for nref in range(maxref):
     
             ns.basis = domain.basis('th-spline', degree=degree)
             ns.x     = geom
@@ -83,12 +82,12 @@ def main(degree  = 2,
             dualspace = domain.refine(1)
             ns.dualbasis = dualspace.basis('th-spline', degree=degree)
     
-            amp  = 0.1 
-            dx   = poi[0] 
-            dy   = poi[1] 
+            c  = 0.05 
+            dx = poi[0] 
+            dy = poi[1] 
     
             #ns.q = (1+function.tanh(amp*(x-dx))) *(1+function.tanh(amp*(dx-x)))*(1+function.tanh(amp*(y-dy)))*(1+function.tanh(amp*(dy-y)))
-            ns.q = function.exp(-((x-dx)**2+(y-dy)**2)/(2*amp**2))
+            ns.q = function.exp(-((x-dx)**2+(y-dy)**2)/(2*c**2))
             B = dualspace.integrate(ns.eval_ij('dualbasis_i,k dualbasis_j,k d:x'), ischeme = 'gauss5')
             Q = dualspace.integrate(ns.eval_i('q dualbasis_i d:x'), ischeme='gauss5')
             
@@ -104,9 +103,6 @@ def main(degree  = 2,
             residual_indicators, res_int, res_jump, res_bound = elem_errors_residual(ns, geom, domain, dualspace, degree) 
             goal_indicators, goal_inter, goal_bound = elem_errors_goal(ns, geom, domain, dualspace, degree) 
 
-            #residual_indicators = func_errors_residual(ns, geom, domain, dualspace, degree) 
-            #goal_indicators = func_errors_goal(ns, geom, domain, dualspace, degree) 
-
             try:
                 maxlvl   += [len(domain.levels)]
             except:
@@ -117,16 +113,17 @@ def main(degree  = 2,
             sum_residual += [sum(residual_indicators.indicators.values())]
             sum_goal     += [sum(goal_indicators.indicators.values())]
             nelems       += [len(domain)]
-   
+            ndofs        += [len(ns.basis)]
+
             if method == 'residual':
                 indicators = {'Indicators':residual_indicators.indicators,'Internal':res_int.indicators,'Interfaces':res_jump.indicators,'Boundary':res_bound.indicators}
-                plotter.plot_indicators(method+'_indicators'+str(nref),domain, geom, indicators)
+                #plotter.plot_indicators(method+'_indicators'+str(nref),domain, geom, indicators)
                 domain = refiner.refine(domain, residual_indicators, num, maxlevel=8)
 
             if method == 'goal':
                 indicators = {'Indicators':goal_indicators.indicators,'Internal':goal_inter.indicators,'Boundary':goal_bound.indicators}
-                plotter.plot_indicators(method+'_indicators'+str(nref),domain, geom, indicators)
-                plotter.plot_solution('dualsolutionprojection'+str(nref),dualspace, geom, ns.z-ns.Iz)
+                #plotter.plot_indicators(method+'_indicators'+str(nref),domain, geom, indicators)
+                #plotter.plot_solution('dualsolutionprojection'+str(nref),dualspace, geom, ns.z-ns.Iz)
                 domain = refiner.refine(domain, goal_indicators, num, maxlevel=8)
 
             if method == 'uniform':
@@ -134,20 +131,21 @@ def main(degree  = 2,
                 if nref == maxuref:
                     break
 
-            plotter.plot_mesh('mesh'+str(nref), domain, geom)
+            #plotter.plot_mesh('mesh'+str(nref), domain, geom)
 
         plotter.plot_mesh('mesh_'+method,domain,geom)
 
         if write:
             writer.write('../results/laplace/lshape'+method+poitype,
-                        {'degree': degree, 'nref': maxref, 'poi': poi},
+                        {'degree': degree, 'nref': maxref, 'num': num, 'poi': poi},
                           maxlvl       = maxlvl,
                           error_exact  = error_exact,
                           error_qoi    = error_qoi,
                           error_est    = error_est,
                           sum_residual = sum_residual,
                           sum_goal     = sum_goal,
-                          nelems       = nelems,)
+                          nelems       = nelems,
+                          ndofs        = ndofs,)
 
 def func_errors_residual(ns, geom, domain, dualspace, degree):
 
