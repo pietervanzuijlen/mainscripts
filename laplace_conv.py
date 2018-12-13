@@ -10,17 +10,23 @@ import treelog
 def main(case = 'lshape',):
 
     #folder = '4dec_degree2/'
-    folder = '5dec_degree3/'
+    #folder = '12dec_topadded/'
+    folder = ''
 
     datalog = treelog.DataLog('../results/laplace/'+folder+'images')
 
     methods = ['residual','goal','uniform']
+    poitypes = ['center','corner','top']
 
-    poitypes = ['center','corner']
+    ####
+    poitypes = ['corner']
+    methods = ['uniform']
+    ####
 
     for poitype in poitypes: 
 
-        for error in ['error_exact','error_qoi','error_est','sum_residual','sum_goal']:
+        #for error in ['error_exact','error_qoi','error_est','sum_residual','sum_goal']:
+        for error in ['norm_L2','norm_H1','residual_e','sum_ind','error_qoi','residual_z','sum_goal']:
             
             xval  = {}
             yval  = {}
@@ -30,21 +36,26 @@ def main(case = 'lshape',):
 
                 text = writer.read('../results/laplace/'+folder+case+methods[i]+poitype)
         
-                xval[method]  = text['nelems']      
+                xval[method]  = text['ndofs']      
                 yval[method]  = text[error]      
                 level[method] = text['maxlvl']
 
-            if error == 'error_exact' or error == 'error_qoi':
-                slopemarker = {}
-                slopemarker['uniform'] = [(-2,3),.03]
-                slopemarker['goal']    = [(-3,2),.12]
-                #slopemarker['goal']    = [(-3,2),.09]
-            else:
-                slopemarker = None
+####
+#            if error == 'error_exact' or error == 'error_qoi':
+#                slopemarker = {}
+#                slopemarker['uniform'] = [(-2,3),.03]
+#                slopemarker['goal']    = [(-3,2),.12]
+#                #slopemarker['goal']    = [(-3,2),.09]
+#            else:
+#                slopemarker = None
+####
+            ####
+            slopemarker = None
+            ####
 
             labels = ['amount of elements','error']
 
-            with treelog.add(datalog):
-                plotter.plot_convergence(poitype+'-'+error, xval, yval, slopemarker=slopemarker, levels=level)
+            #with treelog.add(datalog):
+            plotter.plot_convergence(poitype+'-'+error, xval, yval, slopemarker=slopemarker, levels=level, labels=['Amount of dofs','Error'])
         
 cli.run(main)
