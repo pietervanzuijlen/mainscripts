@@ -15,20 +15,22 @@ from utilities import refiner
 import treelog
 
 def main(degree  = 2,
-         maxref  = 20,
+         maxref  = 4,
          maxuref = 2,
          write   = True,
          npoints = 5,
-         num     = 30,
+         num     = 0.95,
          uref    = 3,): 
 
   #datalog = treelog.DataLog('../results/laplace/images')
 
   methods = ['residual','goal','uniform']
+  methods = ['goal']
 
   #with treelog.add(datalog):
 
-   for poi, poitype in zip([[0,0],[.5,-.5]],['center','corner']):
+  #for poi, poitype in zip([[0,0],[.5,-.5]],['center','corner']):
+  for poi, poitype in zip([[.5,-.5]],['corner']):
 
     for method in methods:
 
@@ -101,7 +103,7 @@ def main(degree  = 2,
             dualspace = domain.refine(1)
             ns.dualbasis = dualspace.basis('th-spline', degree=degree)
     
-            c  = 0.05 
+            c  = 0.01 
             dx = poi[0] 
             dy = poi[1] 
     
@@ -116,7 +118,7 @@ def main(degree  = 2,
             ns.z    = 'dualbasis_n zvec_n'
             ns      = ns(lhs=lhs)
     
-            ns.Iz   = dualspace.project(ns.z, ns.basis, geometry=geom, ischeme='gauss4') 
+            ns.Iz   = dualspace.project(ns.z, ns.basis, geometry=geom, ischeme='gauss5') 
             ns.Iz   = 'basis_n Iz_n'
 
             residual_indicators, res_int, res_jump, res_bound = elem_errors_residual(ns, geom, domain, dualspace, degree) 
@@ -129,31 +131,34 @@ def main(degree  = 2,
             nelems       += [len(domain)]
             ndofs        += [len(ns.basis)]
 
-            error_est    += [domain.integrate(function.abs('uh_,ii d:x' @ns), ischeme='gauss5')]
+            error_est    += [abs(domain.integrate('uh_,ii d:x' @ns, ischeme='gauss5'))]
 
             norm_L2      += [np.sqrt(domain.integrate('e^2 d:x' @ns, ischeme='gauss5'))]
             norm_H1      += [np.sqrt(domain.integrate('(e^2 + e_,i e_,i) d:x' @ns, ischeme='gauss5'))]
-            residual_e   += [np.sqrt(domain.integrate('e_,i e_,i d:x' @ns, ischeme='gauss5'))]
+            residual_e   += [domain.integrate('e_,i e_,i d:x' @ns, ischeme='gauss5')]
             sum_ind      += [sum(residual_indicators.indicators.values())]
 
-            error_qoi    += [domain.integrate(function.abs('(u - uh) q d:x' @ns), ischeme='gauss5')]
-            residual_z   += [dualspace.boundary['patch1-top'].integrate('(g1 (z - Iz)) d:x' @ns, ischeme='gauss5') + 
+            error_qoi    += [abs(domain.integrate('(u - uh) q d:x' @ns, ischeme='gauss5'))]
+            print('int(q) :', domain.integrate('q d:x' @ns, ischeme='gauss5'))
+            residual_z   += [abs(dualspace.boundary['patch1-top'].integrate('(g1 (z - Iz)) d:x' @ns, ischeme='gauss5') + 
                              dualspace.boundary['patch1-right'].integrate('(g2 (z - Iz)) d:x' @ns, ischeme='gauss5') + 
                              dualspace.boundary['patch0-right'].integrate('(g3 (z - Iz)) d:x' @ns, ischeme='gauss5') + 
                              dualspace.boundary['patch0-bottom'].integrate('(g4 (z - Iz)) d:x' @ns, ischeme='gauss5') - 
-                             dualspace.integrate('(uh_,i (z_,i - Iz_,i)) d:x' @ns, ischeme='gauss5')]
-            sum_goal     += [sum(goal_indicators.indicators.values())]
+                             dualspace.integrate('(uh_,i (z_,i - Iz_,i)) d:x' @ns, ischeme='gauss5'))]
+            sum_goal     += [abs(sum(goal_indicators.indicators.values()))]
 
             if method == 'residual':
                 indicators = {'Indicators':residual_indicators.indicators,'Internal':res_int.indicators,'Interfaces':res_jump.indicators,'Boundary':res_bound.indicators}
-                #plotter.plot_indicators(method+'_indicators'+str(nref),domain, geom, indicators)
+                plotter.plot_indicators(method+'_indicators'+str(nref),domain, geom, indicators)
                 goal_indicators = goal_indicators.abs()
                 domain = refiner.refine(domain, residual_indicators, num, maxlevel=8)
 
             if method == 'goal':
                 indicators = {'Indicators':goal_indicators.indicators,'Internal':goal_inter.indicators,'Boundary':goal_bound.indicators}
-                #plotter.plot_indicators(method+'_indicators'+str(nref),domain, geom, indicators)
-                #plotter.plot_solution('dualsolutionprojection'+str(nref),dualspace, geom, ns.z-ns.Iz)
+                plotter.plot_indicators(method+'_indicators'+str(nref),domain, geom, indicators)
+                #plotter.plot_solution('dualsolution'+str(nref),dualspace, geom, ns.z)
+                #plotter.plot_solution('dualsolutionprojection'+str(nref),dualspace, geom, ns.Iz)
+                #plotter.plot_solution('combined'+str(nref),dualspace, geom, function.abs(ns.z-ns.Iz))
                 goal_indicators = goal_indicators.abs()
                 domain = refiner.refine(domain, goal_indicators, num, maxlevel=8)
 
@@ -162,13 +167,13 @@ def main(degree  = 2,
                 if nref == maxuref:
                     break
 
-            #plotter.plot_mesh('mesh'+str(nref), domain, geom)
+            plotter.plot_mesh('mesh'+str(nref), domain, geom)
 
         plotter.plot_mesh('mesh_'+method+poitype,domain,geom)
 
         if write:
             writer.write('../results/laplace/lshape'+method+poitype,
-                        {'degree': degree, 'uref': uref, 'maxuref': maxuref, 'nref': maxref, 'num': num, 'poi': poi},
+                        {'gausian width: c': c, 'degree': degree, 'uref': uref, 'maxuref': maxuref, 'nref': maxref, 'num': num, 'poi': poi},
                           maxlvl       = maxlvl,
                           norm_L2      = norm_L2,
                           norm_H1      = norm_H1,
@@ -182,6 +187,7 @@ def main(degree  = 2,
                           sum_goal     = sum_goal,
                           nelems       = nelems,
                           ndofs        = ndofs,)
+    anouncer.drum()
 
 def func_errors_residual(ns, geom, domain, dualspace, degree):
 
@@ -221,12 +227,12 @@ def elem_errors_residual(ns, geom, domain, dualspace, degree):
     ns.rbound3 = 'g3 - uh_,n n_n'
     ns.rbound4 = 'g4 - uh_,n n_n'
 
-    rint    = function.abs(ns.rint)*function.J(geom)
-    rjump   = function.abs(ns.rjump)*function.J(geom)  
-    rbound1 = function.abs(ns.rbound1)*function.J(geom)
-    rbound2 = function.abs(ns.rbound2)*function.J(geom)
-    rbound3 = function.abs(ns.rbound3)*function.J(geom)
-    rbound4 = function.abs(ns.rbound4)*function.J(geom)
+    rint    = function.abs(ns.rint)
+    rjump   = function.abs(ns.rjump)
+    rbound1 = function.abs(ns.rbound1)
+    rbound2 = function.abs(ns.rbound2)
+    rbound3 = function.abs(ns.rbound3)
+    rbound4 = function.abs(ns.rbound4)
 
     residual_indicators = indicater.elementbased(domain, geom, degree)
     int_indicators = indicater.elementbased(domain, geom, degree)
@@ -252,11 +258,21 @@ def elem_errors_residual(ns, geom, domain, dualspace, degree):
  
 def elem_errors_goal(ns, geom, domain, dualspace, degree):
 
-    ns.gint    = '- uh_,i (z_,i - Iz_,i)'
-    ns.gbound1 = '(g1) (z - Iz)'
-    ns.gbound2 = '(g2) (z - Iz)'
-    ns.gbound3 = '(g3) (z - Iz)'
-    ns.gbound4 = '(g4) (z - Iz)'
+    ns.gint    = '- uh_,i ((z_,i - Iz_,i)^2)^.5'
+    ns.gbound1 = '(g1) ((z - Iz)^2)^.5'
+    ns.gbound2 = '(g2) ((z - Iz)^2)^.5'
+    ns.gbound3 = '(g3) ((z - Iz)^2)^.5'
+    ns.gbound4 = '(g4) ((z - Iz)^2)^.5'
+    #ns.gbound2 = '(g2) (z - Iz)'
+    #ns.gbound3 = '(g3) (z - Iz)'
+    #ns.gbound4 = '(g4) (z - Iz)'
+
+    #ns.gint    = '- uh_,i (z_,i)'
+    #ns.gbound1 = '(g1) (z)'
+    #ns.gbound2 = '(g2) (z)'
+    #ns.gbound3 = '(g3) (z)'
+    #ns.gbound4 = '(g4) (z)'
+
 
     gint    = ns.gint
     gbound1 = ns.gbound1

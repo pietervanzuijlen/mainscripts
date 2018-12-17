@@ -16,11 +16,11 @@ def main(case = 'lshape',):
     datalog = treelog.DataLog('../results/laplace/'+folder+'images')
 
     methods = ['residual','goal','uniform']
-    poitypes = ['center','corner','top']
+    poitypes = ['center','corner']
 
     ####
-    poitypes = ['corner']
-    methods = ['uniform']
+    #poitypes = ['corner']
+    #methods = ['uniform']
     ####
 
     for poitype in poitypes: 
