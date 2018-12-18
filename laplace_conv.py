@@ -9,23 +9,14 @@ import treelog
 #def main(case = 'square'):
 def main(case = 'lshape',):
 
-    #folder = '4dec_degree2/'
-    #folder = '12dec_topadded/'
-    folder = ''
-
-    datalog = treelog.DataLog('../results/laplace/'+folder+'images')
+    datalog = treelog.DataLog('../results/laplace/'+'images')
 
     methods = ['residual','goal','uniform']
+    methods = ['residual','goal']
     poitypes = ['center','corner']
-
-    ####
-    #poitypes = ['corner']
-    #methods = ['uniform']
-    ####
 
     for poitype in poitypes: 
 
-        #for error in ['error_exact','error_qoi','error_est','sum_residual','sum_goal']:
         for error in ['norm_L2','norm_H1','residual_e','sum_ind','error_qoi','residual_z','sum_goal']:
             
             xval  = {}
@@ -36,7 +27,7 @@ def main(case = 'lshape',):
 
                 text = writer.read('../results/laplace/'+folder+case+methods[i]+poitype)
         
-                xval[method]  = text['ndofs']      
+                xval[method]  = numpy.sqrt(text['ndofs'])
                 yval[method]  = text[error]      
                 level[method] = text['maxlvl']
 
@@ -49,13 +40,11 @@ def main(case = 'lshape',):
 #            else:
 #                slopemarker = None
 ####
-            ####
             slopemarker = None
-            ####
 
-            labels = ['amount of elements','error']
+            labels = ['sqrt(ndofs)','error']
 
             #with treelog.add(datalog):
-            plotter.plot_convergence(poitype+'-'+error, xval, yval, slopemarker=slopemarker, levels=level, labels=['Amount of dofs','Error'])
+            plotter.plot_convergence(poitype+'-'+error, xval, yval, slopemarker=slopemarker, levels=level, labels=labels)
         
 cli.run(main)
