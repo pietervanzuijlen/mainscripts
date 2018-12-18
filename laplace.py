@@ -9,7 +9,6 @@ from utilities import plotter
 from utilities import indicater 
 from utilities import writer
 from utilities import domainmaker
-from utilities import anouncer
 from utilities import refiner
 
 import treelog
@@ -19,26 +18,16 @@ def main(degree  = 2,
          maxuref = 2,
          write   = True,
          npoints = 5,
-         num     = 0.95,
+         num     = 0.5,
          uref    = 3,): 
 
-  #datalog = treelog.DataLog('../results/laplace/images')
+  datalog = treelog.DataLog('../results/laplace/images')
 
   methods = ['residual','goal','uniform']
-  methods = ['goal']
 
-  #with treelog.add(datalog):
-
-  #for poi, poitype in zip([[0,0],[.5,-.5]],['center','corner']):
-  for poi, poitype in zip([[.5,-.5]],['corner']):
+  for poi, poitype in zip([[0,0],[.5,-.5]],['center','corner']):
 
     for method in methods:
-
-    #    ####
-    #    method = 'uniform'
-    #    poi = [.5,-.5]
-    #    poitype = 'corner'
-    #    ####
 
         domain, geom = domainmaker.lshape(uref=uref)
         ns = function.Namespace()
@@ -64,7 +53,7 @@ def main(degree  = 2,
     
         for nref in range(maxref):
             
-            print('Uniform refinement :', str(nref))
+            log.info(method+' | '+poitype+' | Refinement :'+ str(nref))
     
             ns.basis = domain.basis('th-spline', degree=degree)
             ns.x     = geom
@@ -83,7 +72,6 @@ def main(degree  = 2,
             ns.u  = R**(2/3) * function.Sin(2/3*th+np.pi/3) 
 
             # Primal problem
-    
             ns.uh = 'basis_n ?lhs_n'
             ns.e  = 'u - uh'
     
@@ -99,7 +87,6 @@ def main(degree  = 2,
             ns = ns(lhs=lhs)
     
             # Dual problem
-    
             dualspace = domain.refine(1)
             ns.dualbasis = dualspace.basis('th-spline', degree=degree)
     
@@ -107,7 +94,6 @@ def main(degree  = 2,
             dx = poi[0] 
             dy = poi[1] 
     
-            #ns.q = (1+function.tanh(amp*(x-dx))) *(1+function.tanh(amp*(dx-x)))*(1+function.tanh(amp*(y-dy)))*(1+function.tanh(amp*(dy-y)))
             ns.q = function.exp(-((x-dx)**2+(y-dy)**2)/(2*c**2))
             B = dualspace.integrate(ns.eval_ij('dualbasis_i,k dualbasis_j,k d:x'), ischeme = 'gauss5')
             Q = dualspace.integrate(ns.eval_i('q dualbasis_i d:x'), ischeme='gauss5')
@@ -121,9 +107,11 @@ def main(degree  = 2,
             ns.Iz   = dualspace.project(ns.z, ns.basis, geometry=geom, ischeme='gauss5') 
             ns.Iz   = 'basis_n Iz_n'
 
+            # Collect indicators
             residual_indicators, res_int, res_jump, res_bound = elem_errors_residual(ns, geom, domain, dualspace, degree) 
             goal_indicators, goal_inter, goal_bound = elem_errors_goal(ns, geom, domain, dualspace, degree) 
 
+            # Define error values for convergence plots
             try:
                 maxlvl   += [len(domain.levels)]
             except:
@@ -139,14 +127,14 @@ def main(degree  = 2,
             sum_ind      += [sum(residual_indicators.indicators.values())]
 
             error_qoi    += [abs(domain.integrate('(u - uh) q d:x' @ns, ischeme='gauss5'))]
-            print('int(q) :', domain.integrate('q d:x' @ns, ischeme='gauss5'))
-            residual_z   += [abs(dualspace.boundary['patch1-top'].integrate('(g1 (z - Iz)) d:x' @ns, ischeme='gauss5') + 
-                             dualspace.boundary['patch1-right'].integrate('(g2 (z - Iz)) d:x' @ns, ischeme='gauss5') + 
-                             dualspace.boundary['patch0-right'].integrate('(g3 (z - Iz)) d:x' @ns, ischeme='gauss5') + 
-                             dualspace.boundary['patch0-bottom'].integrate('(g4 (z - Iz)) d:x' @ns, ischeme='gauss5') - 
+            residual_z   += [abs(dualspace.boundary['patch1-top'].integrate('(g1 ((z - Iz)^2)^.5) d:x' @ns, ischeme='gauss5') + 
+                             dualspace.boundary['patch1-right'].integrate('(g2 ((z - Iz)^2)^.5) d:x' @ns, ischeme='gauss5') + 
+                             dualspace.boundary['patch0-right'].integrate('(g3 ((z - Iz)^2)^.5) d:x' @ns, ischeme='gauss5') + 
+                             dualspace.boundary['patch0-bottom'].integrate('(g4 ((z - Iz)^2)^.5) d:x' @ns, ischeme='gauss5') - 
                              dualspace.integrate('(uh_,i (z_,i - Iz_,i)) d:x' @ns, ischeme='gauss5'))]
             sum_goal     += [abs(sum(goal_indicators.indicators.values()))]
 
+            # Refine mesh
             if method == 'residual':
                 indicators = {'Indicators':residual_indicators.indicators,'Internal':res_int.indicators,'Interfaces':res_jump.indicators,'Boundary':res_bound.indicators}
                 plotter.plot_indicators(method+'_indicators'+str(nref),domain, geom, indicators)
@@ -167,9 +155,8 @@ def main(degree  = 2,
                 if nref == maxuref:
                     break
 
-            plotter.plot_mesh('mesh'+str(nref), domain, geom)
-
-        plotter.plot_mesh('mesh_'+method+poitype,domain,geom)
+            with treelog.add(datalog):
+                plotter.plot_mesh('mesh_'+method+poitype+str(nref), domain, geom)
 
         if write:
             writer.write('../results/laplace/lshape'+method+poitype,
@@ -187,7 +174,6 @@ def main(degree  = 2,
                           sum_goal     = sum_goal,
                           nelems       = nelems,
                           ndofs        = ndofs,)
-    anouncer.drum()
 
 def func_errors_residual(ns, geom, domain, dualspace, degree):
 
