@@ -14,17 +14,16 @@ from utilities import refiner
 import treelog
 
 def main(degree  = 2,
-         maxref  = 1,
-         maxuref = 2,
+         maxref  = 12,
+         maxuref = 4,
          write   = True,
          npoints = 5,
          num     = 0.51,
-         uref    = 3,): 
+         uref    = 0,): 
 
   datalog = treelog.DataLog('../results/square/images')
 
   methods = ['residual','goal','uniform']
-  methods = ['residual','goal']
 
   interest = zip([[np.pi,0]],['corner'])
 
@@ -32,7 +31,7 @@ def main(degree  = 2,
 
     for method in methods:
 
-        domain, geom = mesh.rectilinear([numpy.linspace(0,np.pi,2),numpy.linspace(0,np.pi,2)])
+        domain, geom = mesh.rectilinear([numpy.linspace(0,np.pi,3),numpy.linspace(0,np.pi,3)])
         domain = domain.refine(uref)
         ns = function.Namespace()
 
@@ -65,7 +64,7 @@ def main(degree  = 2,
             ns.pi    = np.pi
 
             #neumann BC
-            ns.g = 'cos(0.5 x_1) sinh(x_0)'
+            ns.g = 'sin(x_1) cosh(x_0)'
 
             #exact solution
             ns.u = 'sin(x_1) sinh(x_0)'
@@ -86,7 +85,7 @@ def main(degree  = 2,
             dualspace = domain.refine(1)
             ns.dualbasis = dualspace.basis('th-spline', degree=degree)
     
-            c  = 0.01 
+            c  = 0.1 
             dx = poi[0] 
             dy = poi[1] 
     
@@ -126,6 +125,8 @@ def main(degree  = 2,
             residual_z   += [abs(dualspace.boundary['right'].integrate('(g ((z - Iz)^2)^.5) d:x' @ns, ischeme='gauss5') -
                              dualspace.integrate('(uh_,i ((z_,i - Iz_,i)^2)^.5) d:x' @ns, ischeme='gauss5'))]
             sum_goal     += [abs(sum(goal_indicators.indicators.values()))]
+            
+            print('Area of QoI: ',domain.integrate('q d:x' @ns, ischeme='gauss5'))
 
             # Refine mesh
             if method == 'residual':
@@ -146,7 +147,7 @@ def main(degree  = 2,
             with treelog.add(datalog):
                 plotter.plot_mesh('mesh_'+method+poitype+str(nref), domain, geom)
 
-        plotter.plot_solution('solution_'+method+poitype+str(nref), domain, geom, ns.uh)
+        plotter.plot_solution('solution_'+method+poitype+str(nref), domain, geom, ns.uh, alpha=1)
         plotter.plot_solution('exactsolution_'+method+poitype+str(nref), domain, geom, ns.u)
 
         if write:

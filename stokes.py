@@ -24,7 +24,7 @@ def main(
          M1:      'position of central circle'      = .35,
          write:   'write results to file'           = True,
          npoints: 'number of sample points'         = 5,
-         num:     'to be refined fraction'          = 85,
+         num:     'to be refined fraction'          = .5,
          uref:    'number of uniform refinements'   = 2,
          ):
 
@@ -34,7 +34,7 @@ def main(
   methods = ['residual','goal','uniform']
 
   with treelog.add(datalog):
-
+    for mid in [0.5, 0.4, 0.35]:
         for method in methods:
     
             domain, geom = domainmaker.porous(uref=uref, M1=mid)
@@ -234,8 +234,8 @@ def elem_errors_residual(ns, geom, domain, dualspace, degree):
  
 def elem_errors_goal(ns, geom, domain, dualspace, degree):
 
-    ns.inflow = 'g_i (z_i - Iz_i)'
-    ns.inter  = '-mu (u_i,j + u_j,i) (z_i,j + Iz_i,j) + p (z_i,i + Iz_i,i)'
+    ns.inflow = 'g_i ((z_i - Iz_i)^2)^.5'
+    ns.inter  = '-mu (u_i,j + u_j,i) ((z_i,j + Iz_i,j)^2)^.5 + p ((z_i,i + Iz_i,i)^2)^.5)'
 
     inflow = ns.inflow*function.J(geom)
     inter = ns.inter*function.J(geom)
