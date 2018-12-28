@@ -10,21 +10,22 @@ from utilities import indicater
 from utilities import writer
 from utilities import domainmaker
 from utilities import refiner
+from utilities import anouncer
 
 import treelog
 
 def main(degree  = 2,
-         maxref  = 4,
+         maxref  = 8,
          maxuref = 2,
          write   = True,
          npoints = 5,
-         num     = 0.51,
+         num     = 0.8,
          uref    = 3,): 
 
   datalog = treelog.DataLog('../results/laplace/images')
 
   methods = ['residual','goal','uniform']
-  methods = ['residual','goal']
+  #methods = ['goal']
 
   interest = zip([[.5,-.5]],['corner'])
 
@@ -137,6 +138,19 @@ def main(degree  = 2,
                              dualspace.integrate('(uh_,i ((z_,i - Iz_,i)^2)^.5) d:x' @ns, ischeme='gauss5'))]
             sum_goal     += [abs(sum(goal_indicators.indicators.values()))]
 
+
+            #plotter.plot_solution('projection_'+method+poitype+str(nref), dualspace, geom, ns.z-ns.Iz, alpha=1, grid=domain, cmap='gist_heat')
+            #plotter.plot_solution('abs_projection_'+method+poitype+str(nref), dualspace, geom, function.abs(ns.z-ns.Iz), alpha=1, grid=domain, cmap='gist_heat')
+
+            #projection_indicators = indicater.elementbased(domain, geom, degree)
+            #projection_indicators = projection_indicators.goaloriented(dualspace, ns.z-ns.Iz, 'internal')
+
+            #abs_projection_indicators = indicater.elementbased(domain, geom, degree)
+            #abs_projection_indicators = abs_projection_indicators.goaloriented(dualspace, function.abs(ns.z-ns.Iz), 'internal')
+
+            #indicators = {'z - Iz':projection_indicators.indicators, '|z - Iz|':abs_projection_indicators.indicators}
+            #plotter.plot_indicators('projection_indicators'+str(nref),domain, geom, indicators, shape=21)
+
             # Refine mesh
             if method == 'residual':
                 indicators = {'Indicators':residual_indicators.indicators,'Internal':res_int.indicators,'Interfaces':res_jump.indicators,'Boundary':res_bound.indicators}
@@ -240,11 +254,17 @@ def elem_errors_residual(ns, geom, domain, dualspace, degree):
  
 def elem_errors_goal(ns, geom, domain, dualspace, degree):
 
-    ns.gint    = '- uh_,i ((z_,i - Iz_,i)^2)^.5'
-    ns.gbound1 = 'g1 ((z - Iz)^2)^.5'
-    ns.gbound2 = 'g2 ((z - Iz)^2)^.5'
-    ns.gbound3 = 'g3 ((z - Iz)^2)^.5'
-    ns.gbound4 = 'g4 ((z - Iz)^2)^.5'
+    #ns.gint    = '- uh_,i ((z_,i - Iz_,i)^2)^.5'
+    #ns.gbound1 = 'g1 ((z - Iz)^2)^.5'
+    #ns.gbound2 = 'g2 ((z - Iz)^2)^.5'
+    #ns.gbound3 = 'g3 ((z - Iz)^2)^.5'
+    #ns.gbound4 = 'g4 ((z - Iz)^2)^.5'
+
+    ns.gint    = '- uh_,i abs(z - Iz)_,i'
+    ns.gbound1 = 'g1 abs(z - Iz)'
+    ns.gbound2 = 'g2 abs(z - Iz)'
+    ns.gbound3 = 'g3 abs(z - Iz)'
+    ns.gbound4 = 'g4 abs(z - Iz)'
 
     goal_indicators = indicater.elementbased(domain, geom, degree)
     int_indicators = indicater.elementbased(domain, geom, degree)

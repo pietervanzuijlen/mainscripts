@@ -65,7 +65,7 @@ def main(degree  = 2,
             ns.pi    = np.pi
 
             #neumann BC
-            ns.g = 'cos(0.5 x_1) sinh(x_0)'
+            ns.g = 'sin(x_1) cosh(x_0)'
 
             #exact solution
             ns.u = 'sin(x_1) sinh(x_0)'
