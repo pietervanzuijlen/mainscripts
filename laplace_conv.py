@@ -12,8 +12,8 @@ def main(case = 'lshape',):
     datalog = treelog.DataLog('../results/laplace/'+'images')
 
     methods = ['residual','goal','uniform']
-    methods = ['residual','goal']
     poitypes = ['center','corner']
+    poitypes = ['corner']
 
     for poitype in poitypes: 
 
@@ -25,7 +25,7 @@ def main(case = 'lshape',):
 
             for i, method in enumerate(methods):
 
-                text = writer.read('../results/laplace/'+folder+case+methods[i]+poitype)
+                text = writer.read('../results/laplace/'+case+methods[i]+poitype)
         
                 xval[method]  = numpy.sqrt(text['ndofs'])
                 yval[method]  = text[error]      

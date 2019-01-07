@@ -54,8 +54,8 @@ def main(
     
                 # Primal problem
     
-                ns.ubasis, ns.pbasis = function.chain([domain.basis('th-spline', degree=degree, patchcontinuous=True, continuity=degree-2).vector(2),
-                                                       domain.basis('th-spline', degree=degree-1, patchcontinuous=True, continuity=degree-2)])
+                ns.ubasis, ns.pbasis = function.chain([domain.basis('th-spline', degree=degree, patchcontinuous=True, continuity=degree-1).vector(2),
+                                                       domain.basis('th-spline', degree=degree-1, patchcontinuous=True, continuity=degree-1)])
     
                 # Trail functions
                 ns.u_i = 'ubasis_ni ?trail_n'
@@ -82,8 +82,8 @@ def main(
                 # Dual problem
                 dualspace = domain.refine(1)
     
-                ns.dualubasis, ns.dualpbasis = function.chain([dualspace.basis('th-spline', degree=degree, patchcontinuous=True, continuity=degree-2).vector(2),
-                                                               dualspace.basis('th-spline', degree=degree-1, patchcontinuous=True, continuity=degree-2)])
+                ns.dualubasis, ns.dualpbasis = function.chain([dualspace.basis('th-spline', degree=degree, patchcontinuous=True, continuity=degree-1).vector(2),
+                                                               dualspace.basis('th-spline', degree=degree-1, patchcontinuous=True, continuity=degree-1)])
         
                 # Trail functions
                 ns.z_i = 'dualubasis_ni ?dualtrail_n'
