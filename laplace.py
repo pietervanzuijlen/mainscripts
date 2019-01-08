@@ -107,9 +107,13 @@ def main(degree  = 1,
     
             ns.Iz   = domain.projection(ns.z, ns.basis, geometry=geom, degree=dualdegree*2, constrain=cons)
 
-            # Collect indicators
+            ## element based indicators
             residual_indicators, res_int, res_jump, res_bound = elem_errors_residual(ns, geom, domain, degree) 
             goal_indicators, goal_inter, goal_jump, goal_bound, goal_sharp = elem_lnorm_goal(ns, geom, domain, degree)
+            
+            ## function based indicators
+            #residual_indicators = func_errors_residual(ns, geom, domain, degree)
+            #goal_indicators = func_errors_goal(ns, geom, domain, degree)
 
             # Define error values for convergence plots
             try:
@@ -144,13 +148,13 @@ def main(degree  = 1,
             if method == 'residual':
                 indicators = {'Indicators absolute':residual_indicators.abs_indicators(),'Internal':res_int.indicators,'Interfaces':res_jump.indicators,'Boundary':res_bound.indicators}
                 plotter.plot_indicators(method+'_indicators'+str(nref),domain, geom, indicators)
-                domain = refiner.refine(domain, residual_indicators, num, maxlevel=6)
+                domain = refiner.dorfler_marking(domain, residual_indicators, num, maxlevel=4+uref)
 
             if method == 'goal':
                 indicators = {'Internal':goal_inter.indicators,'Boundary':goal_bound.indicators, 'Interface':goal_jump.indicators, '||z-Iz||':goal_sharp.indicators}
                 plotter.plot_indicators(method+'_contributions'+str(nref),domain, geom, indicators)
                 plotter.plot_indicators(method+'_indicators'+str(nref),domain, geom, {'Indicators absolute':goal_indicators.abs_indicators()})
-                domain = refiner.refine(domain, goal_indicators, num, maxlevel=6)
+                domain = refiner.dorfler_marking(domain, goal_indicators, num, maxlevel=4+uref)
 
             if method == 'uniform':
                 domain = domain.refine(1)
