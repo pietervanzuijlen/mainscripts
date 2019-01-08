@@ -15,50 +15,42 @@ from utilities import anouncer
 import treelog
 
 def main(degree  = 1,
-         maxref  = 5,
-         maxuref = 2,
+         maxref  = 10,
+         maxuref = 3,
          write   = True,
          npoints = 5,
          num     = 0.5,
-         uref    = 3,): 
+         uref    = 3,
+         QoI     = 'singularity'): 
 
   datalog = treelog.DataLog('../results/laplace/images')
+  methods = ['residual','goal','uniform']
 
-  #methods = ['residual','goal','uniform']
-  methods = ['goal']
-
-  qois = [[.5,-.5]]
-  qoitypes = ['corner']
-
-  for qoi, qoitype in zip(qois, qoitypes):
+  with treelog.add(datalog):
 
     for method in methods:
 
         domain, geom = domainmaker.lshape(uref=uref, width=2, height=2)
         ns = function.Namespace()
 
-        error_est  = []
-        norm_L2    = []
-        norm_H1    = []
-        residual_e = []
-        sum_ind    = []
-        error_qoi  = []
-        residual_z = []
-        sum_goal   = []
-
-        qoi_area     = []
-        error_exact  = []
-        error_qoi    = []
-        error_est    = []
-        sum_residual = []
-        sum_goal     = []
-        maxlvl       = []
-        nelems       = []
-        ndofs        = []
+        # Values to save
+        error_est   = []
+        norm_L2     = []
+        norm_H1     = []
+        residual_e  = []
+        sum_ind     = []
+        error_qoi   = []
+        residual_z  = []
+        sum_goal    = []
+        error_exact = []
+        error_qoi   = []
+        maxlvl      = []
+        nelems      = []
+        ndofs       = []
     
         for nref in range(maxref):
             
-            log.info(method+' | '+qoitype+' | Refinement :'+ str(nref))
+            log.info(method+' | Refinement :'+ str(nref))
     
             ns.basis = domain.basis('th-spline', degree=degree, patchcontinuous=True, continuity=degree-1)
             ns.x     = geom
@@ -97,33 +89,27 @@ def main(degree  = 1,
 
             ns.z = 'dualbasis_n ?duallhs_n'
     
-            c  = 0.05 
-            dx = qoi[0] 
-            dy = qoi[1] 
-    
-            ns.q = function.exp(-((x-dx)**2+(y-dy)**2)/(2*c**2))
             B = domain.integrate(ns.eval_ij('dualbasis_i,k dualbasis_j,k d:x'), degree=dualdegree*2)
+
+            # Gausian data
+            #c  = 0.05 
+            #dx = 1 
+            #dy = -1 
+            #ns.q = function.exp(-((x-dx)**2+(y-dy)**2)/(2*c**2))
             #Q = domain.integrate(ns.eval_i('q dualbasis_i d:x'), degree=dualdegree*2)
-            
+
             Q = domain.boundary['patch0-bottom'].boundary['right'].integrate(ns.eval_i('dualbasis_i d:x'), degree=dualdegree*2)
 
             consdual = domain.boundary['patch0-left,patch1-left'].project(0, onto=ns.dualbasis, geometry=geom, degree=dualdegree*2)
     
             duallhs = B.solve(Q, constrain = consdual)
-            #ns.z    = 'dualbasis_n zvec_n'
             ns      = ns(duallhs=duallhs)
     
-            #ns.Iz   = domain.projection(ns.z, ns.basis, geometry=geom, degree=dualdegree*2, constrain=cons, ptype='convolute')
-            #ns.Iz   = domain.projection(ns.z, ns.basis, geometry=geom, degree=dualdegree*2, constrain=cons, exact_boundaries=True)
             ns.Iz   = domain.projection(ns.z, ns.basis, geometry=geom, degree=dualdegree*2, constrain=cons)
 
             # Collect indicators
             residual_indicators, res_int, res_jump, res_bound = elem_errors_residual(ns, geom, domain, degree) 
-            #goal_indicators, goal_inter, goal_bound, sharpsolution, sharpgradsolution = elem_errors_goal(ns, geom, domain, degree)
-            goal_indicators, goal_inter, goal_jump, goal_bound = elem_lnorm_goal(ns, geom, domain, degree)
-
-            #residual_indicators = func_errors_residual(ns, geom, domain, degree)
-            #goal_indicators = func_errors_goal(ns, geom, domain, degree)
+            goal_indicators, goal_inter, goal_jump, goal_bound, goal_sharp = elem_lnorm_goal(ns, geom, domain, degree)
 
             # Define error values for convergence plots
             try:
@@ -141,7 +127,6 @@ def main(degree  = 1,
             residual_e   += [domain.integrate('e_,i e_,i d:x' @ns, degree=degree*2)]
             sum_ind      += [sum(residual_indicators.indicators.values())]
 
-            qoi_area     += [abs(domain.integrate('q d:x' @ns, degree=degree*2))]
             error_exact  += [abs(domain.integrate('(u - uh) d:x' @ns, degree=degree*2))]
             residual_z   += [domain.boundary['patch1-top'].integrate('g1 (z - Iz) d:x' @ns, degree=degree*2) + 
                              domain.boundary['patch1-right'].integrate('g2 (z - Iz) d:x' @ns, degree=degree*2) + 
@@ -149,66 +134,41 @@ def main(degree  = 1,
                              domain.boundary['patch0-bottom'].integrate('g4 (z - Iz) d:x' @ns, degree=degree*2) - 
                              domain.integrate('uh_,i (z - Iz)_,i d:x' @ns, degree=degree*2)]
             sum_goal     += [sum(goal_indicators.indicators.values())]
-
-
-            #Qref =  domain.refine(3).integrate('u q d:x' @ns, degree=degree*2)
+    
             Qref = domain.boundary['patch0-bottom'].boundary['right'].integrate('u d:x' @ ns , ischeme='gauss1')
-            #log.user('Qref :', Qref)
-
-            #Q =  domain.integrate('uh q d:x' @ns, degree=degree*2)
             Q = domain.boundary['patch0-bottom'].boundary['right'].integrate('uh d:x' @ ns , ischeme='gauss1')
-            #log.user('Qref - Q:', Qref-Q)
-
             error_qoi    += [Qref-Q]
 
-            #log.user('R(z-Iz) :', residual_z[-1])
-
-            #log.user('sum :', sum(goal_indicators.indicators.values()))
-
-            ns.gradu = 'uh_,i n_i'
-            plotter.plot_solution('grad_of_solution'+str(nref), domain, geom, ns.gradu, grid=domain, cmap='gist_heat', alpha=0.5)
-            plotter.plot_solution('dualsolution'+str(nref), domain, geom, ns.z)
-            plotter.plot_solution('projected_dualsolution'+str(nref), domain, geom, ns.Iz)
-            plotter.plot_solution('sharpdualsolution'+str(nref), domain, geom, ns.z-ns.Iz, grid=domain, cmap='gist_heat', alpha=0.5)
-
-            ns.gradz = '(z - Iz)_,i n_i'
-            plotter.plot_solution('grad_of_sharpdualsolution'+str(nref), domain, geom, ns.gradz, grid=domain, cmap='gist_heat', alpha=0.5)
-
-            #sharpind = {'Sharpsolution':sharpsolution.indicators}
-            #sharpgradind = {'Sharpgradsolution':sharpgradsolution.indicators}
-            #plotter.plot_indicators('Sharp'+str(nref),domain, geom, sharpind)
-            #plotter.plot_indicators('Sharpgrad'+str(nref),domain, geom, sharpgradind)
 
             # Refine mesh
             if method == 'residual':
                 indicators = {'Indicators absolute':residual_indicators.abs_indicators(),'Internal':res_int.indicators,'Interfaces':res_jump.indicators,'Boundary':res_bound.indicators}
                 plotter.plot_indicators(method+'_indicators'+str(nref),domain, geom, indicators)
-                domain = refiner.refine(domain, residual_indicators, num, maxlevel=5)
+                domain = refiner.refine(domain, residual_indicators, num, maxlevel=6)
 
             if method == 'goal':
-                indicators = {'Indicators absolute':goal_indicators.abs_indicators(),'Internal':goal_inter.indicators,'Boundary':goal_bound.indicators, 'Interface':goal_jump.indicators}
-                plotter.plot_indicators(method+'_indicators'+str(nref),domain, geom, indicators)
-                domain = refiner.refine(domain, goal_indicators, num, maxlevel=5)
+                indicators = {'Internal':goal_inter.indicators,'Boundary':goal_bound.indicators, 'Interface':goal_jump.indicators, '||z-Iz||':goal_sharp.indicators}
+                plotter.plot_indicators(method+'_contributions'+str(nref),domain, geom, indicators)
+                plotter.plot_indicators(method+'_indicators'+str(nref),domain, geom, {'Indicators absolute':goal_indicators.abs_indicators()})
+                domain = refiner.refine(domain, goal_indicators, num, maxlevel=6)
 
             if method == 'uniform':
                 domain = domain.refine(1)
                 if nref == maxuref:
                     break
 
-            plotter.plot_mesh('mesh_'+method+qoitype+str(nref), domain, geom)
+            plotter.plot_mesh('mesh_'+method+QoI+str(nref), domain, geom)
 
-        plotter.plot_solution('solution', domain, geom, ns.uh)
 
         if write:
-            writer.write('../results/laplace/lshape'+method+qoitype,
-                        {'gausian width: c': c, 'degree': degree, 'uref': uref, 'maxuref': maxuref, 'nref': maxref, 'num': num, 'qoi': qoi},
+            writer.write('../results/laplace/lshape'+method+QoI,
+                        {'degree': degree, 'uref': uref, 'maxuref': maxuref, 'nref': maxref, 'num': num, 'QoI': QoI},
                           maxlvl       = maxlvl,
                           norm_L2      = norm_L2,
                           norm_H1      = norm_H1,
                           residual_e   = residual_e,
                           residual_z   = residual_z,
                           sum_ind      = sum_ind,
-                          qoi_area     = qoi_area,
                           error_exact  = error_exact,
                           error_qoi    = error_qoi,
                           error_est    = error_est,
@@ -216,27 +176,26 @@ def main(degree  = 1,
                           nelems       = nelems,
                           ndofs        = ndofs,)
 
-  convergence(qoitypes, methods)
+    convergence(QoI, methods)
 
-def convergence(qoitypes, methods):
+def convergence(QoI, methods):
 
-    for qoitype in qoitypes: 
-        for error in ['norm_L2','norm_H1','residual_e','sum_ind','error_qoi','residual_z','sum_goal']:
-            
-            xval  = {} 
-            yval  = {}
-            level = {}
-
-            for i, method in enumerate(methods):
-
-                text = writer.read('../results/laplace/lshape'+methods[i]+qoitype)
+    for error in ['norm_L2','norm_H1','residual_e','sum_ind','error_qoi','residual_z','sum_goal']:
         
-                xval[method]  = numpy.sqrt(text['ndofs'])
-                yval[method]  = text[error]      
+        xval  = {} 
+        yval  = {}
+        level = {}
 
-            labels = ['sqrt(ndofs)','error']
+        for i, method in enumerate(methods):
 
-            plotter.plot_convergence(qoitype+'-'+error, xval, yval, labels=labels, title=error)
+            text = writer.read('../results/laplace/lshape'+methods[i]+QoI)
+    
+            xval[method]  = numpy.sqrt(text['ndofs'])
+            yval[method]  = text[error]      
+
+        labels = ['sqrt(ndofs)','error']
+
+        plotter.plot_convergence(QoI+'-'+error, xval, yval, labels=labels, title=error)
         
 def func_errors_residual(ns, geom, domain, degree):
 
@@ -309,15 +268,6 @@ def elem_errors_residual(ns, geom, domain, degree):
 
 def elem_errors_goal(ns, geom, domain, degree):
 
-    ns.sharp   = '(z - Iz)'
-    ns.sharpgrad = '(z_,i - Iz_,i) n_i'
-    
-    sharpsolution    = indicater.elementbased(domain, geom, degree, dualspacetype='k-refined')
-    sharpgradsolution    = indicater.elementbased(domain, geom, degree, dualspacetype='k-refined')
-
-    sharpsolution.goaloriented(domain, ns.sharp, 'internal')
-    sharpgradsolution.goaloriented(domain, ns.sharpgrad, 'internal')
-
     ns.gint    = '-uh_,i abs(z_,i - Iz_,i)'
     ns.gbound1 = 'g1 abs(z - Iz)'
     ns.gbound2 = 'g2 abs(z - Iz)'
@@ -347,7 +297,7 @@ def elem_errors_goal(ns, geom, domain, degree):
     bound_indicators.goaloriented(domain.boundary['patch0-right'], ns.gbound3, 'boundary')
     bound_indicators.goaloriented(domain.boundary['patch0-bottom'], ns.gbound4, 'boundary')
 
-    return goal_indicators, int_indicators, bound_indicators, sharpsolution, sharpgradsolution
+    return goal_indicators, int_indicators, bound_indicators 
  
 def elem_lnorm_goal(ns, geom, domain, degree):
 
@@ -364,6 +314,9 @@ def elem_lnorm_goal(ns, geom, domain, degree):
     int_indicators      = indicater.elementbased(domain, geom, degree, dualspacetype='k-refined')
     jump_indicators     = indicater.elementbased(domain, geom, degree, dualspacetype='k-refined')
     bound_indicators    = indicater.elementbased(domain, geom, degree, dualspacetype='k-refined')
+    sharp_indicators    = indicater.elementbased(domain, geom, degree, dualspacetype='k-refined')
+
+    sharp_indicators.goaloriented(domain, ns.rz, 'internal')
 
     goal_indicators.goaloriented(domain, ns.rint*ns.rz, 'internal')
     int_indicators.goaloriented(domain, ns.rint*ns.rz, 'internal')
@@ -381,7 +334,7 @@ def elem_lnorm_goal(ns, geom, domain, degree):
     bound_indicators.goaloriented(domain.boundary['patch0-right'], ns.rbound3*ns.rz, 'boundary')
     bound_indicators.goaloriented(domain.boundary['patch0-bottom'], ns.rbound4*ns.rz, 'boundary')
 
-    return goal_indicators, int_indicators, jump_indicators, bound_indicators
+    return goal_indicators, int_indicators, jump_indicators, bound_indicators, sharp_indicators
  
 
 with config(verbose=3,nprocs=6):
