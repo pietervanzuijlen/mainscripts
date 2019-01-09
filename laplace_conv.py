@@ -13,7 +13,7 @@ def main(case = 'lshape',):
 
     methods = ['residual','goal','uniform']
     poitypes = ['center','corner']
-    poitypes = ['corner']
+    poitypes = ['singularity']
 
     for poitype in poitypes: 
 

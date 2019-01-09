@@ -14,12 +14,12 @@ from utilities import anouncer
 
 import treelog
 
-def main(degree  = 1,
-         maxref  = 10,
+def main(degree  = 2,
+         maxref  = 7,
          maxuref = 3,
          write   = True,
          npoints = 5,
-         num     = 0.5,
+         num     = 0.3,
          uref    = 3,
          QoI     = 'singularity'): 
 
@@ -109,7 +109,7 @@ def main(degree  = 1,
 
             ## element based indicators
             residual_indicators, res_int, res_jump, res_bound = elem_errors_residual(ns, geom, domain, degree) 
-            goal_indicators, goal_inter, goal_jump, goal_bound, goal_sharp = elem_lnorm_goal(ns, geom, domain, degree)
+            goal_indicators, goal_inter, goal_jump, goal_bound, goal_sharp = elem_lnorm_goal(ns, geom, domain, dualdegree)
             
             ## function based indicators
             #residual_indicators = func_errors_residual(ns, geom, domain, degree)
