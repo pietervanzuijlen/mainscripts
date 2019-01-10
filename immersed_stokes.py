@@ -23,7 +23,7 @@ def main(
          maxrefine  = 3,
          uref       = 2,
          beta       = 0.5,
-         num        = 0.3,
+         num        = 0.5,
          ):
 
     # Defining grid 
@@ -248,8 +248,8 @@ def get_indicators(domain, geom, ns, dualdegree):
     bound_ind.goaloriented(domain.boundary['left'], inflow*sharpz, 'boundary')
     bound_ind.goaloriented(domain.boundary['right'], outflow*sharpz, 'boundary')
 
-    z_ind.goaloriented(domain, sharps, 'internal')
-    s_ind.goaloriented(domain, sharpz, 'internal')
+    z_ind.goaloriented(domain, sharpz, 'internal')
+    s_ind.goaloriented(domain, sharps, 'internal')
 
     return indicators, force_ind, incom_ind, bound_ind, jump_ind, z_ind, s_ind
 

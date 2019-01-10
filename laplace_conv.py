@@ -17,7 +17,7 @@ def main(case = 'lshape',):
 
     for poitype in poitypes: 
 
-        for error in ['norm_L2','norm_H1','residual_e','sum_ind','error_qoi','residual_z','sum_goal']:
+        for error in ['error_exact','error_est','error_qoi','residual_z','nelems']:
             
             xval  = {}
             yval  = {}
@@ -31,16 +31,13 @@ def main(case = 'lshape',):
                 yval[method]  = text[error]      
                 level[method] = text['maxlvl']
 
-####
-#            if error == 'error_exact' or error == 'error_qoi':
-#                slopemarker = {}
-#                slopemarker['uniform'] = [(-2,3),.03]
-#                slopemarker['goal']    = [(-3,2),.12]
-#                #slopemarker['goal']    = [(-3,2),.09]
-#            else:
-#                slopemarker = None
-####
-            slopemarker = None
+            if error == 'error_est':
+                slopemarker = {}
+                slopemarker['uniform'] = [(-1,1),.03]
+                slopemarker['goal']    = [(-2,1),.12]
+                #slopemarker['goal']    = [(-3,2),.09]
+            else:
+                slopemarker = None
 
             labels = ['sqrt(ndofs)','error']
 

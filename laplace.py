@@ -26,8 +26,7 @@ def main(degree  = 2,
   datalog = treelog.DataLog('../results/laplace/images')
   methods = ['residual','goal','uniform']
 
-  with treelog.add(datalog):
-
+  for num in [0.25,0.5,0.75]:
     for method in methods:
 
         domain, geom = domainmaker.lshape(uref=uref, width=2, height=2)
@@ -161,11 +160,11 @@ def main(degree  = 2,
                 if nref == maxuref:
                     break
 
-            plotter.plot_mesh('mesh_'+method+QoI+str(nref), domain, geom)
+        plotter.plot_mesh('mesh_'+method+QoI+str(nref), domain, geom)
 
 
         if write:
-            writer.write('../results/laplace/lshape'+method+QoI,
+            writer.write('../results/laplace/lshape'+method+QoI+str(num),
                         {'degree': degree, 'uref': uref, 'maxuref': maxuref, 'nref': maxref, 'num': num, 'QoI': QoI},
                           maxlvl       = maxlvl,
                           norm_L2      = norm_L2,
@@ -320,19 +319,16 @@ def elem_lnorm_goal(ns, geom, domain, degree):
     bound_indicators    = indicater.elementbased(domain, geom, degree, dualspacetype='k-refined')
     sharp_indicators    = indicater.elementbased(domain, geom, degree, dualspacetype='k-refined')
 
-    sharp_indicators.goaloriented(domain, ns.rz, 'internal')
-
     goal_indicators.goaloriented(domain, ns.rint*ns.rz, 'internal')
-    int_indicators.goaloriented(domain, ns.rint*ns.rz, 'internal')
-
     goal_indicators.goaloriented(domain.interfaces, ns.rjump*ns.rz, 'interface')
-    jump_indicators.goaloriented(domain.interfaces, ns.rjump*ns.rz, 'interface')
-
     goal_indicators.goaloriented(domain.boundary['patch1-top'], ns.rbound1*ns.rz, 'boundary')
     goal_indicators.goaloriented(domain.boundary['patch1-right'], ns.rbound2*ns.rz, 'boundary')
     goal_indicators.goaloriented(domain.boundary['patch0-right'], ns.rbound3*ns.rz, 'boundary')
     goal_indicators.goaloriented(domain.boundary['patch0-bottom'], ns.rbound4*ns.rz, 'boundary')
 
+    sharp_indicators.goaloriented(domain, ns.rz, 'internal')
+    jump_indicators.goaloriented(domain.interfaces, ns.rjump*ns.rz, 'interface')
+    int_indicators.goaloriented(domain, ns.rint*ns.rz, 'internal')
     bound_indicators.goaloriented(domain.boundary['patch1-top'], ns.rbound1*ns.rz, 'boundary')
     bound_indicators.goaloriented(domain.boundary['patch1-right'], ns.rbound2*ns.rz, 'boundary')
     bound_indicators.goaloriented(domain.boundary['patch0-right'], ns.rbound3*ns.rz, 'boundary')
