@@ -1,260 +1,193 @@
 '''
-In this code different forms of adaptivity are tested on a domain on which the stokes problem is solved. Goal-oriented, residual-based and uniform refinement will be compared.
+In this code different forms of adaptivity are tested on an lshaped domain on which a laplace problem is solved. The exact solution to this problem is known. Goal-oriented, residual-based and uniform refinement will be compared.
 
 '''
-
-from   nutils import *
+from nutils import *
+from utilities import *
 import numpy as np
-import matplotlib.pyplot as plt
-from   matplotlib import collections
-from utilities import writer
-from utilities import plotter
-from utilities import domainmaker
-from utilities import indicater
-from utilities import anouncer
-from utilities import refiner
 
-import treelog
+def main(degree      = 3,
+         maxref      = 3,
+         npoints     = 5,
+         num         = 0.75,
+         uref        = 1,
+         maxreflevel = 4,
+         maxuref     = 4,
+         M1          = 0.5):
 
-def main(
-         degree:  'polynomial degree for velocity'  = 3,
-         mu:      'viscosity'                       = 1.,
-         maxref:  'number of refinement iterations' = 30,
-         maxuref: 'maximum uniform refinements'     = 3,
-         M1:      'position of central circle'      = .35,
-         write:   'write results to file'           = True,
-         npoints: 'number of sample points'         = 5,
-         num:     'to be refined fraction'          = .5,
-         uref:    'number of uniform refinements'   = 2,
-         ):
+    methods = ['goaloriented','residualbased']
+    methods = ['goaloriented']
+    methods = ['uniform']
 
-  mid = M1
-  datalog = treelog.DataLog('../results/stokes/images')
+    nelems    = {} 
+    ndofs     = {} 
+    error_est = {} 
+    error_qoi = {} 
 
-  methods = ['residual','goal','uniform']
+    for method in methods:
 
-  with treelog.add(datalog):
-    for mid in [0.5, 0.4, 0.35]:
-        for method in methods:
-    
-            domain, geom = domainmaker.porous(uref=uref, M1=mid)
-            ns = function.Namespace()
-    
-            ns.mu = mu 
-            ns.x = geom
-            ns.pbar = 1
+        nelems[method]    = []
+        ndofs[method]     = []
+        error_est[method] = []
+        error_qoi[method] = []
+        
+        domain, geom = domainmaker.porous(uref=uref, M1=M1)
+        ns = function.Namespace()
+
+        ns.mu   = 1
+        ns.pbar = 1
+        ns.x    = geom
+
+        for nref in range(maxref):
             
-            maxlvl       = []
-            residual     = []
-            sum_residual = []
-            sum_goal     = []
-            nelems       = []
+            ### Primal problem ###
+            ns.ubasis, ns.pbasis = function.chain([domain.basis('th-spline', degree=degree, patchcontinuous=True, continuity=degree-1).vector(2),
+                                                   domain.basis('th-spline', degree=degree-1, patchcontinuous=True, continuity=degree-2)])
+
+            # Trail functions
+            ns.u_i = 'ubasis_ni ?trail_n'
+            ns.p = 'pbasis_n ?trail_n'
+            
+            # Test functions
+            ns.v_i = 'ubasis_ni ?test_n'
+            ns.q = 'pbasis_n ?test_n'
     
-            for nref in range(maxref):
-    
-                # Primal problem
-    
-                ns.ubasis, ns.pbasis = function.chain([domain.basis('th-spline', degree=degree, patchcontinuous=True, continuity=degree-1).vector(2),
-                                                       domain.basis('th-spline', degree=degree-1, patchcontinuous=True, continuity=degree-1)])
-    
-                # Trail functions
-                ns.u_i = 'ubasis_ni ?trail_n'
-                ns.p = 'pbasis_n ?trail_n'
-                
-                # Test functions
-                ns.v_i = 'ubasis_ni ?test_n'
-                ns.q = 'pbasis_n ?test_n'
-    
-                ns.stress_ij = 'mu (u_i,j + u_j,i) - p δ_ij'
-                ns.g_n = 'n_n'
-                            
-                # boundary condition
-                sqr = domain.boundary['top,bottom,corners,circle'].integral('u_k u_k d:x' @ ns, degree=degree*2)
-                cons = solver.optimize('trail', sqr, droptol=1e-15)
-    
-                res = domain.integral('(stress_ij v_i,j + q u_l,l) d:x' @ ns, degree=degree*2)
-                res += domain.boundary['left'].integral('(g_i v_i) d:x' @ ns, degree=degree*2)
-                
-                trail = solver.solve_linear('trail', res.derivative('test'), constrain=cons)
-                
-                ns = ns(trail=trail) 
-                
-                # Dual problem
-                dualspace = domain.refine(1)
-    
-                ns.dualubasis, ns.dualpbasis = function.chain([dualspace.basis('th-spline', degree=degree, patchcontinuous=True, continuity=degree-1).vector(2),
-                                                               dualspace.basis('th-spline', degree=degree-1, patchcontinuous=True, continuity=degree-1)])
+            # Stress
+            ns.stress_ij = 'mu (u_i,j + u_j,i) - p δ_ij'
+
+            # Inflow pressure
+            ns.g_n = 'pbar n_n'
         
-                # Trail functions
-                ns.z_i = 'dualubasis_ni ?dualtrail_n'
-                ns.s = 'dualpbasis_n ?dualtrail_n'
+            # boundary condition
+            sqr = domain.boundary['top,bottom,corners,circle'].integral('u_k u_k d:x' @ ns, degree=degree*2)
+            cons = solver.optimize('trail', sqr, droptol=1e-15)
     
-                # Test functions
-                ns.v_i = 'dualubasis_ni ?dualtest_n'
-                ns.q = 'dualpbasis_n ?dualtest_n'
+            res = domain.integral('(stress_ij v_i,j - q u_l,l) d:x' @ ns, degree=degree*2)
+            res += domain.boundary['left'].integral('(g_i v_i) d:x' @ ns, degree=degree*2)
+            
+            trail = solver.solve_linear('trail', res.derivative('test'), constrain=cons)
+            
+            ns = ns(trail=trail) 
+            ### Primal problem ###
     
-                sqr = dualspace.boundary['top,bottom,corners,circle'].integral('z_k z_k d:x' @ ns, degree=degree*2)
-                cons = solver.optimize('dualtrail', sqr, droptol=1e-15)
     
-                res = dualspace.integral('(( mu (v_i,j + v_j,i) - q δ_ij ) z_i,j - s v_i,i ) d:x' @ ns, degree=degree*2).derivative('dualtest')
+            ### Dual problem ###
+            dualdegree = degree + 1
 
-                # Quantity of interest: outflow
-                res += dualspace.boundary['left'].integral('( -v_i n_i ) d:x' @ ns, degree=degree*2).derivative('dualtest')
-
-                # Quantity of interest: drag coefficient
-                #res += dualspace.boundary['circle'].integral(' n_i (mu (v_i,j + v_j,i) - q δ_ij) <1 , 0>_j d:x' @ ns, degree=degree*2).derivative('dualtest')
-
-                # Quantity of interest: lift coefficient
-                #res += dualspace.boundary['circle'].integral(' n_i (mu (v_i,j + v_j,i) - q δ_ij) <0 , 1>_j d:x' @ ns, degree=degree*2).derivative('dualtest')
+            ns.dualubasis, ns.dualpbasis = function.chain([domain.basis('th-spline', degree=dualdegree, patchcontinuous=True, continuity=dualdegree-1).vector(2),
+                                                           domain.basis('th-spline', degree=dualdegree-1, patchcontinuous=True, continuity=dualdegree-2)])
     
-                dualtrail = solver.solve_linear('dualtrail', res, constrain=cons)
+            # Trail functions
+            ns.z_i = 'dualubasis_ni ?dualtrail_n'
+            ns.s = 'dualpbasis_n ?dualtrail_n'
     
-                ns = ns(dualtrail=dualtrail)
+            # Test functions
+            ns.v_i = 'dualubasis_ni ?dualtest_n'
+            ns.q = 'dualpbasis_n ?dualtest_n'
     
-                ns.Iz   = dualspace.project(ns.z, ns.ubasis, geometry=geom, ischeme='gauss4') 
-                ns.Iz_i = 'ubasis_ni Iz_n'
-                ns.Is   = dualspace.project(ns.s, ns.pbasis, geometry=geom, ischeme='gauss4') 
-                ns.Is   = 'pbasis_n Is_n'
+            sqr = domain.boundary['top,bottom,corners,circle'].integral('z_k z_k d:x' @ ns, degree=dualdegree*2)
+            cons = solver.optimize('dualtrail', sqr, droptol=1e-15)
     
-                # Getting the indicators
-                residual_indicators, res_int, res_jump, res_bound = elem_errors_residual(ns, geom, domain, dualspace, degree) 
-                goal_indicators, goal_inter, goal_inflow = elem_errors_goal(ns, geom, domain, dualspace, degree) 
+            res = domain.integral('(( mu (v_i,j + v_j,i) - q δ_ij ) z_i,j - s v_i,i ) d:x' @ ns, degree=dualdegree*2).derivative('dualtest')
+
+            # Quantity of interest: outflow
+            res += domain.boundary['left'].integral('( -v_i n_i ) d:x' @ ns, degree=dualdegree*2).derivative('dualtest')
+
+            dualtrail = solver.solve_linear('dualtrail', res, constrain=cons)
     
-                #residual_indicators = func_errors_residual(ns, geom, domain, degree) 
-                #goal_indicators = func_errors_goal(ns, geom, domain, dualspace, degree) 
+            ns = ns(dualtrail=dualtrail)
     
-                # Building lists with error data
-                try:
-                    maxlvl   += [len(domain.levels)]
-                except:
-                    maxlvl   += [1]
-                residual     += [domain.integrate(function.norm2('(-mu (u_i,jj + u_j,ij) + p_,i) d:x' @ns)+function.abs('u_i,i d:x' @ns), ischeme='gauss5')]
-                sum_residual += [sum(residual_indicators.indicators.values())]
-                sum_goal     += [sum(goal_indicators.indicators.values())]
-                nelems       += [len(domain)]
+            ns.Iz   = domain.project(ns.z, ns.ubasis, geometry=geom, ischeme='gauss4') 
+            ns.Iz_i = 'ubasis_ni Iz_n'
+            ns.Is   = domain.project(ns.s, ns.pbasis, geometry=geom, ischeme='gauss4') 
+            ns.Is   = 'pbasis_n Is_n'
+            ### Dual problem ###
     
-
-                # Refining and plotting 
-                if method == 'residual':
-                    indicators = {'Indicators':residual_indicators.indicators,'Internal':res_int.indicators,'Interfaces':res_jump.indicators,'Boundary':res_bound.indicators}
-                    plotter.plot_indicators(method+'_indicators'+str(nref),domain, geom, indicators)
-                    domain = refiner.refine(domain, residual_indicators, num)
-                    
-                if method == 'goal':
-                    indicators = {'Indicators':goal_indicators.indicators,'Internal':goal_inter.indicators,'Boundary':goal_inflow.indicators}
-                    plotter.plot_indicators(method+'_indicators'+str(nref),domain, geom, indicators)
-                    domain = refiner.refine(domain, goal_indicators, num)
-                    
-                if method == 'uniform':
-                    domain = domain.refine(1)
-                    if nref == maxuref:
-                        break
+            
+            ### Get errors ###
+            nelems[method]    += [len(domain)]
+            ndofs[method]     += [len(ns.ubasis)]
+            error_est[method] += [domain.integrate(function.norm2('(-mu (u_i,jj + u_j,ij) + p_,i) d:x' @ns)+function.abs('u_i,i d:x' @ns), ischeme='gauss5')]
+            error_qoi[method] += [domain.integrate('(-mu (u_i,j + u_j,i) (z_i,j - Iz_i,j) + p (z_i,i - Iz_i,i) + s u_i,i) d:x' @ns, ischeme='gauss5')+domain.boundary['left'].integrate('g_i (z_i - Iz_i) d:x' @ns, ischeme='gauss5')]
+            ### Get errors ###
     
-                plotter.plot_mesh('mesh_'+method+str(mid)+'_'+str(nref),domain,geom)
-        
-            if write:
-                writer.write('../results/stokes'+method+str(mid),
-                            {'degree': degree, 'nref': maxref, 'refinement number': num},
-                              maxlvl       = maxlvl,
-                              residual     = residual,
-                              sum_residual = sum_residual,
-                              sum_goal     = sum_goal,
-                              nelems       = nelems,)
     
-        plotter.plot_streamlines('velocity'+method+str(mid), domain, geom, ns, ns.u)
-        plotter.plot_solution('pressure'+method+str(mid), domain, geom, ns.p)
-        plotter.plot_streamlines('dualvector'+method+str(mid), dualspace, geom, ns, ns.z)
-        plotter.plot_solution('dualscalar'+method+str(mid), dualspace, geom, ns.s)
+            ### Get indicators ###
+            ns.inflow  = '(g_i + stress_ij n_j) (g_i + stress_ik n_k)'
+            ns.outflow = '(- stress_ij n_j) (- stress_ik n_k)'
+            ns.jump    = '([-stress_ij] n_j) ([-stress_ik] n_k)'
+            ns.force   = '(stress_ij,j) (stress_ik,k)'
+            ns.incom   = '(u_i,i)^2'
+            ns.zsharp  = '(z_i - Iz_i) (z_i - Iz_i)'
+            ns.ssharp  = '(s - Is)^2'
 
-def func_errors_residual(ns, geom, domain, degree):
+            h = np.sqrt(indicater.integrate(domain, geom, degree, 1, domain))
 
-    indicators = indicater.functionbased(domain, geom, ns.evalbasis, degree)
+            incom    = np.sqrt(indicater.integrate(domain, geom, degree, ns.incom, domain))
+            force    = np.sqrt(indicater.integrate(domain, geom, degree, ns.force, domain))
+            jump     = np.sqrt(indicater.integrate(domain, geom, degree, ns.jump, domain.interfaces, interfaces=True))
+            inflow   = np.sqrt(indicater.integrate(domain, geom, degree, ns.inflow, domain.boundary['left']))
+            outflow  = np.sqrt(indicater.integrate(domain, geom, degree, ns.outflow, domain.boundary['right']))
     
-    ns.momentum_j = '- mu (u_i,ji + u_j,ii) + p_,j'
-    ns.incompress = 'u_i,i'    
+            z_int     = np.sqrt(indicater.integrate(domain, geom, degree, ns.zsharp, domain))
+            s_int     = np.sqrt(indicater.integrate(domain, geom, degree, ns.ssharp, domain))
+            z_jump    = np.sqrt(indicater.integrate(domain, geom, degree, ns.zsharp, domain.interfaces, interfaces=True))
+            z_inflow  = np.sqrt(indicater.integrate(domain, geom, degree, ns.zsharp, domain.boundary['left']))
+            z_outflow = np.sqrt(indicater.integrate(domain, geom, degree, ns.zsharp, domain.boundary['right']))
 
-    indicators = indicators.add(domain, ns.evalbasis, function.norm2(ns.momentum))
-    indicators = indicators.add(domain, ns.evalbasis, function.abs(ns.incompress))
-    indicators = indicators.abs()
+            rz = z_int + z_jump + z_inflow + z_outflow
+            ### Get indicaters ###
 
-    return indicators
-
-def func_errors_goal(ns, geom, domain, dualspace, degree):
-
-    indicators = indicater.functionbased(dualspace, geom, ns.evalbasis, degree)
+            #plotter.plot_streamlines('velocity'+str(nref), domain, geom, ns, ns.u) 
+            #plotter.plot_streamlines('dual_velocity'+str(nref), domain, geom, ns, ns.z) 
+            #plotter.plot_solution('pressure'+str(nref), domain, geom, ns.p) 
+            plotter.plot_solution('force'+str(nref), domain, geom, ns.force) 
+            #plotter.plot_solution('incomp'+str(nref), domain, geom, ns.incom) 
     
-    ns.inter = 'mu (u_i,j + u_j,i) (z_i,j - Iz_i,j) - p (z_i,i - Iz_i,i)'
-    ns.bound = 'g_i (z_i - Iz_i)'
-    ns.incom = '(s - Is) u_i,i'
-
-    indicators = indicators.add(dualspace, ns.evalbasis, ns.inter)
-    indicators = indicators.add(dualspace.boundary['left'], ns.evalbasis, ns.bound)
-    indicators = indicators.abs()
-    indicators = indicators.add(dualspace, ns.evalbasis, function.abs(ns.incom))
-    indicators = indicators.abs()
-
-    return indicators
-
-def elem_errors_residual(ns, geom, domain, dualspace, degree):
-
-    ns.inflow_i  = 'g_i + stress_ij n_j'
-    ns.jump_i    = '[-stress_ij] n_j '
-    ns.force_i   = 'stress_ij,j'
-    ns.incom     = 'u_i,i'
-    ns.outflow_i = '- stress_ni n_n'
-
-    inflow  = function.norm2(ns.inflow)*function.J(geom)
-    jump    = function.norm2(ns.jump)*function.J(geom)
-    force   = function.norm2(ns.force)*function.J(geom)
-    incom   = function.abs(ns.incom)*function.J(geom)
-    outflow = function.norm2(ns.outflow)*function.J(geom)
-
-    residual_indicators = indicater.elementbased(domain, geom, degree)
-    int_indicators      = indicater.elementbased(domain, geom, degree)
-    jump_indicators     = indicater.elementbased(domain, geom, degree)
-    bound_indicators    = indicater.elementbased(domain, geom, degree)
-
-    residual_indicators = residual_indicators.residualbased(domain, force, 'internal')
-    residual_indicators = residual_indicators.residualbased(domain, incom, 'internal')
-    int_indicators      = int_indicators.residualbased(domain, force, 'internal')
-    int_indicators      = int_indicators.residualbased(domain, incom, 'internal')
-
-    residual_indicators = residual_indicators.residualbased(domain.interfaces, jump, 'interface')
-    jump_indicators     = jump_indicators.residualbased(domain.interfaces, jump, 'interface')
-
-    residual_indicators = residual_indicators.residualbased(domain.boundary['left'], inflow, 'boundary')
-    bound_indicators    = bound_indicators.residualbased(domain.boundary['left'], inflow, 'boundary')
-
-    residual_indicators = residual_indicators.residualbased(domain.boundary['right'], outflow, 'boundary')
-    bound_indicators    = bound_indicators.residualbased(domain.boundary['right'], outflow, 'boundary')
-
-    return residual_indicators, int_indicators, jump_indicators, bound_indicators
-
-
- 
-def elem_errors_goal(ns, geom, domain, dualspace, degree):
-
-    ns.inflow = 'g_i ((z_i - Iz_i)^2)^.5'
-    ns.inter  = '-mu (u_i,j + u_j,i) ((z_i,j + Iz_i,j)^2)^.5 + p ((z_i,i + Iz_i,i)^2)^.5)'
-
-    inflow = ns.inflow*function.J(geom)
-    inter = ns.inter*function.J(geom)
     
-    goal_indicators   = indicater.elementbased(domain, geom, degree)
-    inflow_indicators = indicater.elementbased(domain, geom, degree)
-    inter_indicators  = indicater.elementbased(domain, geom, degree)
+            ### Refine mesh ###
+            if method == 'goaloriented':
 
-    goal_indicators   = goal_indicators.goaloriented(dualspace.boundary['left'], inflow, 'boundary')
-    inflow_indicators   = inflow_indicators.goaloriented(dualspace.boundary['left'], inflow, 'boundary')
+                # assemble indicaters
+                inter = incom*s_int + force*z_int
+                jump  = jump*z_jump
+                bound = inflow*z_inflow + outflow*z_outflow
 
-    goal_indicators  = goal_indicators.goaloriented(dualspace, inter, 'internal')
-    inter_indicators  = inter_indicators.goaloriented(dualspace, inter, 'internal')
+                indicators =  inter + jump + bound 
 
-    goal_indicators = goal_indicators.abs()
+                plotter.plot_indicators('residual_contributions_'+str(nref), domain, geom, {'force':force,'incompressibility':incom,'interfaces':jump,'boundaries':inflow+outflow}, normalize=False)
+                plotter.plot_indicators('sharp_contributions_'+str(nref), domain, geom, {'z_internal':z_int,'s_internal':s_int,'z_interfaces':z_jump,'z_boundaries':z_inflow+outflow}, normalize=False)
+                plotter.plot_indicators('indicators_'+method+'_'+str(nref), domain, geom, {'indicator':indicators,'internal':inter,'interfaces':jump,'boundaries':bound}, normalize=False)
 
-    return goal_indicators, inter_indicators, inflow_indicators
+                domain = refiner.fractional_marking(domain, indicators, num, ns.pbasis, maxlevel=maxreflevel+uref)
+                plotter.plot_levels('mesh_'+str(nref), domain, geom)
 
- 
+            if method == 'residualbased':
+
+                # assemble indicaters
+                inter = (incom + force)*h
+                jump  = jump*np.sqrt(h)
+                bound = (inflow + outflow)*np.sqrt(h)
+
+                indicators =  inter + jump + bound 
+
+                plotter.plot_indicators('indicators_'+method+'_'+str(nref), domain, geom, {'indicator':indicators})
+                
+                domain = refiner.fractional_marking(domain, indicators, num, ns.pbasis, maxlevel=maxreflevel+uref)
+                plotter.plot_mesh('mesh_'+str(nref), domain, geom)
+
+            if method == 'uniform':
+
+                domain = domain.refine(1)
+
+                if nref == maxuref:
+                    break
+    
+    plotter.plot_convergence('Estimated_error',ndofs,error_est,labels=['dofs','Estimated error'])
+    plotter.plot_convergence('Estimated_error_in_QoI',ndofs,error_qoi,labels=['dofs','Estimated error in QoI'])
+    plotter.plot_convergence('Dofs_vs_elems',nelems,ndofs,labels=['nelems','ndofs'])
+
+    anouncer.drum()
+
 with config(verbose=3,nprocs=6):
     cli.run(main)
-

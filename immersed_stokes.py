@@ -80,7 +80,23 @@ def main(
         ghost = topology.UnstructuredTopology(background.ndims-1, ghost)
     
         ns = function.Namespace()
-    
+
+        areas = domain.integrate_elementwise(function.J(geom), degree=degree)
+        gridareas = grid.integrate_elementwise(function.J(geom), degree=degree)
+
+        h_K = np.sqrt(np.mean(gridareas))
+
+        he_map = {}
+        hF_map = {}
+        for elem, area in zip(domain, areas):
+            trans = elem.transform
+            he_map[trans] = np.sqrt(area)
+            head, tail = transform.lookup(trans, domain.edict)
+            hF_map[elem.transform] = h_K*0.5**(len(head)-2-uref)
+
+        ns.he = function.elemwise(he_map, ())
+        ns.hF = function.elemwise(hF_map, ())
+
         ns.mu   = 1 
         ns.pbar = 1
         ns.x    = geom
@@ -92,9 +108,6 @@ def main(
         ns.ubasis, ns.pbasis = function.chain([domain.basis('th-spline', degree=degree, continuity=degree-1).vector(2),
                                                domain.basis('th-spline', degree=degree, continuity=degree-1)])
     
-        # Get h_e 
-        areas = domain.integrate_elementwise(function.J(geom), degree=degree)
-        ns.h  = np.mean(np.sqrt(areas))
         
         # Trail functions
         ns.u_i = 'ubasis_ni ?trail_n'
@@ -108,7 +121,7 @@ def main(
         ns.g_n = 'n_n'
     
         # nitsche term
-        ns.nitsche  = '-mu ( (u_i,j + u_j,i) n_i) v_j + ( (v_i,j + v_j,i) n_i ) u_j + mu (beta / h) v_i u_i + p v_i n_i - q u_i n_i'
+        ns.nitsche  = '-mu ( (u_i,j + u_j,i) n_i) v_j + ( (v_i,j + v_j,i) n_i ) u_j + mu (beta / he) v_i u_i + p v_i n_i - q u_i n_i'
     
         # Getting skeleton and ghost stabilization terms
         norm_derivative  = '({val}_,{i} n_{i})'
@@ -127,8 +140,8 @@ def main(
         ns.gskel  = 0.05
         ns.gghost = 0.005
         
-        ns.skeleton = 'gskel mu^-1 h^{} [[{}]] [[{}]]'.format(2*degree+1, jumpp, jumpq)
-        ns.ghost    = 'gghost  mu h^{} [[{}]] [[{}]]'.format(2*degree-1, jumpu, jumpv)
+        ns.skeleton = 'gskel mu^-1 hF^{} [[{}]] [[{}]]'.format(2*degree+1, jumpp, jumpq)
+        ns.ghost    = 'gghost  mu hF^{} [[{}]] [[{}]]'.format(2*degree-1, jumpu, jumpv)
     
         res  = domain.integral('(stress_ij v_i,j + q u_l,l) d:x' @ ns, degree=degree*2)
         res += domain.boundary['top,bottom,trimmed'].integral('nitsche d:x' @ns, degree=degree*2)
@@ -157,7 +170,7 @@ def main(
         ns.q = 'sbasis_n ?dualtest_n'
         
         # nitsche term
-        ns.nitsche  = '-mu ( (z_i,j + z_j,i) n_i) v_j + ( (v_i,j + v_j,i) n_i ) z_j + mu (beta / h) v_i z_i - s v_i n_i + q z_i n_i'
+        ns.nitsche  = '-mu ( (z_i,j + z_j,i) n_i) v_j + ( (v_i,j + v_j,i) n_i ) z_j + mu (beta / he) v_i z_i - s v_i n_i + q z_i n_i'
     
         #ns.nitsche  = '-mu ( (u_i,j + u_j,i) n_i) v_j + ( (v_i,j + v_j,i) n_i ) u_j + mu (beta / h) v_i u_i + p v_i n_i + q u_i n_i'
         # Getting skeleton and ghost stabilization terms
@@ -177,8 +190,8 @@ def main(
         ns.gskel  = 0.05
         ns.gghost = 0.005
         
-        ns.skeleton = 'gskel mu^-1 h^{} [[{}]] [[{}]]'.format(2*dualdegree+1, jumpq, jumps)
-        ns.ghost    = 'gghost  mu h^{} [[{}]] [[{}]]'.format(2*dualdegree-1, jumpv, jumpz)
+        ns.skeleton = 'gskel mu^-1 hF^{} [[{}]] [[{}]]'.format(2*dualdegree+1, jumpq, jumps)
+        ns.ghost    = 'gghost  mu hF^{} [[{}]] [[{}]]'.format(2*dualdegree-1, jumpv, jumpz)
     
         # Quantity of interest: outflow
         res = domain.integral('(( mu (v_i,j + v_j,i) - q δ_ij ) z_i,j + s v_l,l ) d:x' @ ns, degree=dualdegree*2)
@@ -199,12 +212,43 @@ def main(
     
     
         # plotting
-        plotter.plot_indicators('Indicators_'+str(nref),domain, geom, {'Elem sizes':indicators.indicators})
-        plotter.plot_indicators('Contributions_'+str(nref),domain, geom, contributions)
-        plotter.plot_solution('sharp_dual_velocity_'+str(nref), domain, geom, function.norm2(ns.z-ns.Iz))
-        plotter.plot_solution('sharp_dual_pressure_'+str(nref), domain, geom, ns.s-ns.Is)
+        #plotter.plot_indicators('Indicators_'+str(nref),domain, geom, {'Elem sizes':indicators.indicators})
+        #plotter.plot_indicators('Contributions_'+str(nref),domain, geom, contributions)
+        plotter.plot_streamlines('sharp_dual_velocity_'+str(nref), domain, geom, ns, ns.z)
+        #plotter.plot_solution('sharp_dual_pressure_'+str(nref), domain, geom, ns.s-ns.Is)
 
-        domain = refiner.fractional_marking(domain, indicators, num)
+        dom = domain.sample('bezier', 20)
+        X, one = dom.eval([geom, 1])
+
+        bezier = domain.boundary['trimmed,bottom,top'].sample('bezier', 20)
+        x = bezier.eval(geom)
+   
+        with export.mplfigure('dirichlet.png') as fig:
+          ax = fig.add_subplot(111, aspect='equal')
+          im = ax.tripcolor(X[:,0], X[:,1], dom.tri, one, shading='gouraud', cmap='summer')
+          ax.scatter(x[:,0],x[:,1],c='r',s=.8)
+   
+        bezier = skeleton.sample('bezier', 20)
+        x = bezier.eval(geom)
+   
+        with export.mplfigure('skeleton.png') as fig:
+          ax = fig.add_subplot(111, aspect='equal')
+          im = ax.tripcolor(X[:,0], X[:,1], dom.tri, one, shading='gouraud', cmap='summer')
+          ax.scatter(x[:,0],x[:,1],c='r',s=.8)
+   
+        bezier = ghost.sample('bezier', 20)
+        x = bezier.eval(geom)
+   
+        with export.mplfigure('ghost.png') as fig:
+          ax = fig.add_subplot(111, aspect='equal')
+          im = ax.tripcolor(X[:,0], X[:,1], dom.tri, one, shading='gouraud', cmap='summer')
+          ax.scatter(x[:,0],x[:,1],c='r',s=.8)
+
+        log.user(domain.integrate(function.norm2('(z_i - Iz_i) d:x' @ns), ischeme = 'gauss5'))
+        log.user(domain.integrate(function.norm2('z_i d:x' @ns), ischeme = 'gauss5'))
+        log.user(domain.integrate(function.norm2('Iz_i d:x' @ns), ischeme = 'gauss5'))
+
+        domain = refiner.dorfler_marking(domain, indicators, num)
         plotter.plot_mesh('mesh_'+str(nref), domain, geom)
 
     anouncer.drum()
@@ -236,7 +280,7 @@ def get_indicators(domain, geom, ns, dualdegree):
     z_ind = indicater.elementbased(domain, geom, dualdegree, dualspacetype='k-refined')
     s_ind = indicater.elementbased(domain, geom, dualdegree, dualspacetype='k-refined')
 
-    indicators.goaloriented(domain, incom*sharps, 'internal')
+    #indicators.goaloriented(domain, incom*sharps, 'internal')
     indicators.goaloriented(domain, force*sharpz, 'internal')
     indicators.goaloriented(domain.interfaces, jump*sharpz, 'interface')
     indicators.goaloriented(domain.boundary['left'], inflow*sharpz, 'boundary')
