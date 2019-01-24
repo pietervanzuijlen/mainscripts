@@ -21,7 +21,7 @@ def main(
          npoints    = 5,
          nelem      = 4,
          maxrefine  = 3,
-         uref       = 2,
+         uref       = 1,
          beta       = 0.5,
          num        = 0.5,
          ):
@@ -44,38 +44,56 @@ def main(
     domain = domain.trim(function.norm2((x0,x1-1))-rc, maxrefine = maxrefine)
     domain = domain.trim(function.norm2((x0-M0,x1-M1))-rm, maxrefine = maxrefine)
 
-
     for nref in range(refinements):
 
         # Defining the background and skeleton 
-        background_elems = []
+
+        #background_elems = []
     
-        for elem in grid:
-            trans = transform.lookup(elem.transform,domain.edict)
-            if trans:
-                background_elems += [elem]
+        #for elem in grid:
+        #    head, tail = domain.transforms.index_with_tail(elem.transform)
+        #    if head:
+        #        background_elems += [elem]
     
-        background = grid.subset(background_elems)
+        #background = grid.subset(background_elems)
+
+        elemind = []
+        for i, trans in enumerate(grid.transforms):
+            if domain.transforms.contains(trans):
+                elemind.append(i)
+
+        background = domain.subset(grid[np.array(elemind)])
+
+        plotter.plot_mesh('grid', grid, geom)
+        plotter.plot_mesh('trim', domain, geom)
+        plotter.plot_mesh('background', background, geom)
+
+###        btopo = topology.SubsetTopology(topo, [elem.reference  if transform.lookup(elem.transform,ttopo.edict) else elem.reference.empty for elem in topo])
+
         skeleton = background.interfaces
         ghost = []
     
         # Defining ghost
-        for iface in skeleton:
-            for trans in iface.transform, iface.opposite:
-            
-                # find the corresponding element in the background mesh
-                ielemb, tailb = transform.lookup_item(trans,background.edict)
-                belem = background.elements[ielemb]
+        ghost_elems = [background.transforms.index_with_tail(trans) for trans in background.boundary]
+        ghost_faces = [domain.interfaces.transforms.index_with_tail(trans) for trans in ghost_elems.interfaces]
+
+        #for iface in skeleton:
+        #    for trans in iface.transform, iface.opposite:
+        #    
+        #        # find the corresponding element in the background mesh
+        #        ielemb, tailb = transform.lookup_item(trans,background.edict)
+        #        ielemb, tailb = background.transforms.index_with_tail(trans) 
+        #        belem = background.elements[head]
       
-                # find the corresponding element in the trimmed mesh
-                ielemt, tailt = transform.lookup_item(trans,domain.edict)
-                telem = domain.elements[ielemt]
+        #        # find the corresponding element in the trimmed mesh
+        #        ielemt, tailt = domain.transforms.index_with_tail(trans) 
+        #        ttrans = domain.transforms[ielemt]
       
-                if belem != telem:
-                  assert belem.transform == telem.transform
-                  assert belem.opposite  == telem.opposite
-                  ghost.append(iface)
-                  break
+        #        if belem != telem:
+        #            assert belem.transform == telem.transform
+        #            assert belem.opposite  == telem.opposite
+        #            ghost.append(iface)
+        #            break
     
         ghost = topology.UnstructuredTopology(background.ndims-1, ghost)
     
