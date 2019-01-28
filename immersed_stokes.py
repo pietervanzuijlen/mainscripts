@@ -62,41 +62,28 @@ def main(
             if domain.transforms.contains(trans):
                 elemind.append(i)
 
-        background = domain.subset(grid[np.array(elemind)])
+        skeleton, ghost = domainmaker.skelghost(grid, domain)
 
-        plotter.plot_mesh('grid', grid, geom)
-        plotter.plot_mesh('trim', domain, geom)
-        plotter.plot_mesh('background', background, geom)
-
-###        btopo = topology.SubsetTopology(topo, [elem.reference  if transform.lookup(elem.transform,ttopo.edict) else elem.reference.empty for elem in topo])
-
-        skeleton = background.interfaces
-        ghost = []
-    
-        # Defining ghost
-        ghost_elems = [background.transforms.index_with_tail(trans) for trans in background.boundary]
-        ghost_faces = [domain.interfaces.transforms.index_with_tail(trans) for trans in ghost_elems.interfaces]
-
-        #for iface in skeleton:
-        #    for trans in iface.transform, iface.opposite:
-        #    
-        #        # find the corresponding element in the background mesh
-        #        ielemb, tailb = transform.lookup_item(trans,background.edict)
-        #        ielemb, tailb = background.transforms.index_with_tail(trans) 
-        #        belem = background.elements[head]
-      
-        #        # find the corresponding element in the trimmed mesh
-        #        ielemt, tailt = domain.transforms.index_with_tail(trans) 
-        #        ttrans = domain.transforms[ielemt]
-      
-        #        if belem != telem:
-        #            assert belem.transform == telem.transform
-        #            assert belem.opposite  == telem.opposite
-        #            ghost.append(iface)
-        #            break
-    
-        ghost = topology.UnstructuredTopology(background.ndims-1, ghost)
-    
+        # plot skeleton                                                                                   
+        dom = domain.sample('bezier', 20)                                                                 
+        X, one = dom.eval([geom, 1])
+        bezier = skeleton.sample('bezier', 20)                                                            
+        x = bezier.eval(geom)
+        with export.mplfigure('skeleton.png') as fig:                                                     
+          ax = fig.add_subplot(111, aspect='equal')
+          im = ax.tripcolor(X[:,0], X[:,1], dom.tri, one, shading='gouraud', cmap='summer')               
+          ax.scatter(x[:,0],x[:,1],c='r',s=.8)
+          
+        # plot ghost                                                                                      
+        dom = domain.sample('bezier', 20)                                                                 
+        X, one = dom.eval([geom, 1])
+        bezier = ghost.sample('bezier', 20)                                                               
+        x = bezier.eval(geom)
+        with export.mplfigure('ghost.png') as fig:                                                        
+          ax = fig.add_subplot(111, aspect='equal')                                                       
+          im = ax.tripcolor(X[:,0], X[:,1], dom.tri, one, shading='gouraud', cmap='summer')               
+          ax.scatter(x[:,0],x[:,1],c='r',s=.8)
+   
         ns = function.Namespace()
 
         areas = domain.integrate_elementwise(function.J(geom), degree=degree)

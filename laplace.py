@@ -6,16 +6,16 @@ from   nutils import *
 import numpy as np
 from utilities import *
 
+@profile
 def main(degree      = 2,
-         maxref      = 1,
+         maxref      = 8,
          npoints     = 5,
          num         = 0.5,
          uref        = 2,
-         maxreflevel = 6,
+         maxreflevel = 3,
          maxuref     = 4):
 
     methods = ['goaloriented','uniform','residualbased']
-    methods = ['goaloriented']
 
     nelems    = {} 
     ndofs     = {} 
@@ -173,11 +173,11 @@ def main(degree      = 2,
             ### Refine mesh ###
         #plotter.plot_levels('mesh_'+method, domain, geom)
     
-    plotter.plot_convergence('Exact_error',ndofs,error_sol,labels=['dofs','Exact error'],slopemarker=True)
-    plotter.plot_convergence('Error_in_QoI',ndofs,error_qoi,labels=['dofs','Error in QoI'],slopemarker=True)
-    plotter.plot_convergence('Dofs_vs_elems',nelems,ndofs,labels=['nelems','ndofs'])
+    #plotter.plot_convergence('Exact_error',ndofs,error_sol,labels=['dofs','Exact error'],slopemarker=True)
+    #plotter.plot_convergence('Error_in_QoI',ndofs,error_qoi,labels=['dofs','Error in QoI'],slopemarker=True)
+    #plotter.plot_convergence('Dofs_vs_elems',nelems,ndofs,labels=['nelems','ndofs'])
 
-    anouncer.drum()
+    #anouncer.drum()
 
 with config(verbose=3,nprocs=6):
     cli.run(main)
