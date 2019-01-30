@@ -6,13 +6,12 @@ from   nutils import *
 import numpy as np
 from utilities import *
 
-@profile
 def main(degree      = 2,
-         maxref      = 8,
+         maxref      = 20,
          npoints     = 5,
          num         = 0.5,
          uref        = 2,
-         maxreflevel = 3,
+         maxreflevel = 7,
          maxuref     = 4):
 
     methods = ['goaloriented','uniform','residualbased']
@@ -98,9 +97,9 @@ def main(degree      = 2,
             RIz = domain.boundary['patch1-top'].integrate('g1 Iz d:x' @ns, degree=degree*2) + domain.boundary['patch1-right'].integrate('g2 Iz d:x' @ns, degree=degree*2) + domain.boundary['patch0-right'].integrate('g3 Iz d:x' @ns, degree=degree*2) + domain.boundary['patch0-bottom'].integrate('g4 Iz d:x' @ns, degree=degree*2) - domain.integrate('uh_,i Iz_,i d:x' @ns, degree=degree*2)
             Rz_Iz = domain.boundary['patch1-top'].integrate('g1 (z - Iz) d:x' @ns, degree=degree*2) + domain.boundary['patch1-right'].integrate('g2 (z - Iz) d:x' @ns, degree=degree*2) + domain.boundary['patch0-right'].integrate('g3 (z - Iz) d:x' @ns, degree=degree*2) + domain.boundary['patch0-bottom'].integrate('g4 (z - Iz) d:x' @ns, degree=degree*2) - domain.integrate('uh_,i (z - Iz)_,i d:x' @ns, degree=degree*2)
     
-            print('R(z)    :', Rz)
-            print('R(Iz)   :', RIz)
-            print('R(z-Iz) :', Rz_Iz)
+            #print('R(z)    :', Rz)
+            #print('R(Iz)   :', RIz)
+            #print('R(z-Iz) :', Rz_Iz)
 
             ### Get indicaters ###
             ns.rint    = '(uh_,ii)^2'
@@ -141,12 +140,12 @@ def main(degree      = 2,
 
                 indicators =  inter + jump + bound 
 
-                plotter.plot_indicators('residual_contributions_'+str(nref), domain, geom, {'internal':rint,'interfaces':rjump,'boundary':rbound1+rbound2+rbound3+rbound4})
-                plotter.plot_indicators('sharp_contributions_'+str(nref), domain, geom, {'internal':rz_int,'interfaces':rz_jump,'boundary':rz_bound1+rz_bound2+rz_bound3+rz_bound4})
-                plotter.plot_indicators('indicators_'+method+'_'+str(nref), domain, geom, {'indicator':indicators,'internal':inter,'interfaces':jump,'boundary':bound})
-                plotter.plot_mesh('mesh_'+str(nref), domain, geom)
+                #plotter.plot_indicators('residual_contributions_'+str(nref), domain, geom, {'internal':rint,'interfaces':rjump,'boundary':rbound1+rbound2+rbound3+rbound4})
+                #plotter.plot_indicators('sharp_contributions_'+str(nref), domain, geom, {'internal':rz_int,'interfaces':rz_jump,'boundary':rz_bound1+rz_bound2+rz_bound3+rz_bound4})
+                #plotter.plot_indicators('indicators_'+method+'_'+str(nref), domain, geom, {'indicator':indicators,'internal':inter,'interfaces':jump,'boundary':bound})
+                #plotter.plot_mesh('mesh_'+str(nref), domain, geom)
 
-                domain, refined = refiner.refine(domain, indicators, num, ns.basis, maxlevel=10, marker_type=None, select_type='highest_supp', refined_check=True)
+                domain, refined = refiner.refine(domain, indicators, num, ns.basis, maxlevel=10, marker_type=None, select_type='same_level', refined_check=True)
 
             if method == 'residualbased':
 
@@ -159,7 +158,7 @@ def main(degree      = 2,
 
                 #plotter.plot_indicators('indicators_'+method+'_'+str(nref), domain, geom, {'indicator':indicators})
                 #plotter.plot_mesh('mesh_'+str(nref), domain, geom)
-                domain, refined = refiner.refine(domain, indicators, num, ns.basis, maxlevel=10, marker_type=None, select_type=None, refined_check=True)
+                domain, refined = refiner.refine(domain, indicators, num, ns.basis, maxlevel=10, marker_type=None, select_type='same_level', refined_check=True)
 
             if method == 'uniform':
 
@@ -171,11 +170,11 @@ def main(degree      = 2,
             if not refined:
                 break
             ### Refine mesh ###
-        #plotter.plot_levels('mesh_'+method, domain, geom)
+        plotter.plot_mesh('mesh_'+method, domain, geom)
     
-    #plotter.plot_convergence('Exact_error',ndofs,error_sol,labels=['dofs','Exact error'],slopemarker=True)
-    #plotter.plot_convergence('Error_in_QoI',ndofs,error_qoi,labels=['dofs','Error in QoI'],slopemarker=True)
-    #plotter.plot_convergence('Dofs_vs_elems',nelems,ndofs,labels=['nelems','ndofs'])
+    plotter.plot_convergence('Exact_error',ndofs,error_sol,labels=['dofs','Exact error'],slopemarker=True)
+    plotter.plot_convergence('Error_in_QoI',ndofs,error_qoi,labels=['dofs','Error in QoI'],slopemarker=True)
+    plotter.plot_convergence('Dofs_vs_elems',nelems,ndofs,labels=['nelems','ndofs'])
 
     #anouncer.drum()
 

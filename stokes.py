@@ -1,16 +1,12 @@
-'''
-In this code different forms of adaptivity are tested on an lshaped domain on which a laplace problem is solved. The exact solution to this problem is known. Goal-oriented, residual-based and uniform refinement will be compared.
-
-'''
 from nutils import *
 from utilities import *
 import numpy as np
 
-def main(degree      = 3,
-         maxref      = 10,
-         npoints     = 5,
-         num         = 0.5,
+def main(degree      = 2,
          uref        = 1,
+         refinements = 3,
+         num         = 0.5,
+         npoints     = 5,
          maxreflevel = 5,
          maxuref     = 3,
          M1          = 0.5):
@@ -37,12 +33,13 @@ def main(degree      = 3,
         domain, geom = domainmaker.porous(uref=uref, M1=M1)
         ns = function.Namespace()
 
-        ns.x    = geom
+        ns.mu = 1
+        ns.x  = geom
 
-        for nref in range(maxref):
+        for nref in range(refinements):
             
             ### Primal problem ###
-            ns.ubasis, ns.pbasis = function.chain([domain.basis('th-spline', degree=degree, patchcontinuous=True, continuity=degree-1).vector(2),
+            ns.ubasis, ns.pbasis = function.chain([domain.basis('th-spline', degree=degree, patchcontinuous=True, continuity=degree-2).vector(2),
                                                    domain.basis('th-spline', degree=degree-1, patchcontinuous=True, continuity=degree-2)])
 
             # Search for better solution !!
@@ -55,17 +52,26 @@ def main(degree      = 3,
             # Test functions
             ns.v_i = 'ubasis_ni ?test_n'
             ns.q = 'pbasis_n ?test_n'
+
+            # Stress
+            ns.stress_ij = 'mu (u_i,j + u_j,i) - p δ_ij'
     
             # Inflow traction 
             ns.g_n = '-n_n'
         
             # boundary condition
             cons = domain.boundary['top,bottom,corners,circle'].project(0, onto=ns.ubasis, geometry=geom, degree=degree*2)
+
+            # Nitsche values
+            ns.beta = .5
+            areas = domain.integrate_elementwise(function.J(geom), degree=degree)
+            ns.he = function.elemwise(domain.transforms, areas)
+            ns.nitsche  = '-mu ( (u_i,j + u_j,i) n_i) v_j + ( (v_i,j + v_j,i) n_i ) u_j + mu (beta / he) v_i u_i + p v_i n_i - q u_i n_i'
     
             res = domain.boundary['left'].integral('(g_i v_i) d:x' @ ns, degree=degree*2)
-            res -= domain.integral('(u_j,i v_j,i - p v_k,k + q u_l,l) d:x' @ ns, degree=degree*2)
-            
-            trail = solver.solve_linear('trail', res.derivative('test'), constrain=cons)
+            res -= domain.integral('(stress_ij v_i,j - q u_l,l) d:x' @ ns, degree=degree*2)
+            res -= domain.boundary['top,bottom,corners,circle'].integral('nitsche d:x' @ns, degree=degree*2)
+            trail = solver.solve_linear('trail', res.derivative('test'))#, constrain=cons)
             
             ns = ns(trail=trail) 
             ### Primal problem ###
@@ -84,13 +90,17 @@ def main(degree      = 3,
             # Test functions
             ns.v_i = 'dualubasis_ni ?dualtest_n'
             ns.q = 'dualpbasis_n ?dualtest_n'
-    
+   
+            # boundary condition
             consdual = domain.boundary['top,bottom,corners,circle'].project(0, onto=ns.dualubasis, geometry=geom, degree=dualdegree*2)
+
+            # Nitsche values
+            ns.nitsche  = '-mu ( (z_i,j + z_j,i) n_i) v_j + ( (v_i,j + v_j,i) n_i ) z_j + mu (beta / he) v_i z_i + s v_i n_i - q z_i n_i'
     
             res = domain.boundary['right'].integral('(n_i v_i) d:x' @ ns, degree=dualdegree*2)
-            res -= domain.integral('((z_j,i + z_i,j) v_j,i - s v_k,k + q z_l,l) d:x' @ ns, degree=dualdegree*2)
-
-            dualtrail = solver.solve_linear('dualtrail', res.derivative('dualtest'), constrain=consdual)
+            res -= domain.integral('(mu (z_j,i + z_i,j) v_j,i - s v_k,k - q z_l,l) d:x' @ ns, degree=dualdegree*2)
+            res -= domain.boundary['top,bottom,corners,circle'].integral('nitsche d:x' @ns, degree=degree*2)
+            dualtrail = solver.solve_linear('dualtrail', res.derivative('dualtest'))#, constrain=consdual)
     
             ns = ns(dualtrail=dualtrail)
 
@@ -116,16 +126,16 @@ def main(degree      = 3,
             error_qoi[method]    += [abs(Rz)]
             error_zincomp[method] += [abs(Rs)]
 
-            print('R(z): ', Rz)
-            print('R(Iz): ', RIz)
-            print('R(z-Iz): ', Rz_Iz)
+            #print('R(z): ', Rz)
+            #print('R(Iz): ', RIz)
+            #print('R(z-Iz): ', Rz_Iz)
 
-            print('R(s): ', Rs)
-            print('R(Is): ', RIs)
-            
-            print('velocity laplacian :', domain.integrate(function.norm2('u_j,ii d:x' @ns), ischeme='gauss5'))
-            print('pressure gradient :',domain.integrate(function.norm2('p_,j d:x' @ns), ischeme='gauss5'))
-            print('mean pressure :',domain.integrate('p d:x' @ns, ischeme='gauss5'))
+            #print('R(s): ', Rs)
+            #print('R(Is): ', RIs)
+            #
+            #print('velocity laplacian :', domain.integrate(function.norm2('u_j,ii d:x' @ns), ischeme='gauss5'))
+            #print('pressure gradient :',domain.integrate(function.norm2('p_,j d:x' @ns), ischeme='gauss5'))
+            #print('mean pressure :',domain.integrate('p d:x' @ns, ischeme='gauss5'))
 
             ### Get errors ###
     
@@ -210,10 +220,10 @@ def main(degree      = 3,
                 break
     
 
-    plotter.plot_convergence('Estimated_error_force',ndofs,error_force,labels=['dofs','Estimated error'])
-    plotter.plot_convergence('Estimated_error_incomp',ndofs,error_incomp,labels=['dofs','Estimated error'])
-    plotter.plot_convergence('Estimated_error_in_QoI',ndofs,error_qoi,labels=['dofs','Estimated error in QoI'])
-    plotter.plot_convergence('Estimated_error_in_zincomp',ndofs,error_zincomp,labels=['dofs','Estimated error in QoI'])
+    plotter.plot_convergence('Estimated_error_force',ndofs,error_force,labels=['dofs','Estimated error'],slopemarker=True)
+    plotter.plot_convergence('Estimated_error_incomp',ndofs,error_incomp,labels=['dofs','Estimated error'],slopemarker=True)
+    plotter.plot_convergence('Estimated_error_in_QoI',ndofs,error_qoi,labels=['dofs','Estimated error in QoI'],slopemarker=True)
+    plotter.plot_convergence('Estimated_error_in_zincomp',ndofs,error_zincomp,labels=['dofs','Estimated error in QoI'],slopemarker=True)
     plotter.plot_convergence('Dofs_vs_elems',nelems,ndofs,labels=['nelems','ndofs'])
 
     anouncer.drum()
