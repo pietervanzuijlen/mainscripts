@@ -6,31 +6,31 @@ from utilities import *
 import numpy as np
 import sys
 
-def main(degree      = 2,
-         refinements = 1,
+def main(degree      = 3,
+         refinements = 10,
          npoints     = 5,
-         num         = 0.5,
+         num         = 0.75,
          uref        = 3,
          maxreflevel = 8,
-         maxuref     = 5,
+         maxuref     = 4,
          beta        = 50,):
 
     sys.setrecursionlimit(9999)    
 
     methods = ['goaloriented','residualbased','uniform']
-    methods = ['uniform']
+    methods = ['goaloriented']
 
-    nelems    = {} 
-    ndofs     = {} 
-    error_velocity = {} 
-    error_pressure = {} 
+    nelems = {} 
+    ndofs  = {} 
+    err_u = {} 
+    err_p = {} 
 
     for method in methods:
 
       nelems[method] = []
       ndofs[method]  = []
-      error_velocity[method] = []
-      error_pressure[method] = []
+      err_u[method]  = []
+      err_p[method]  = []
 
       domain, geom = domainmaker.annulus(uref=uref)
 
@@ -79,9 +79,6 @@ def main(degree      = 2,
 
         # Stress
         ns.stress_ij = 'mu (uh_i,j + uh_j,i) - ph δ_ij '
-       
-        # boundary condition
-        cons = domain.boundary.project(0, onto=ns.ubasis, geometry=geom, degree=degree*2)
 
         # nitsche term
         ns.nitsche  = 'mu ( (uh_i,j + uh_j,i) n_i) v_j + mu ( (v_i,j + v_j,i) n_i ) uh_j - mu (beta / he) v_i uh_i - ph v_i n_i - q uh_i n_i'
@@ -100,7 +97,7 @@ def main(degree      = 2,
 
         dualdegree = degree + 1
     
-        ns.zbasis, ns.sbasis, ns.Lbasis = function.chain([domain.basis('th-spline', degree=dualdegree, continuity=dualdegree-1).vector(2),
+        ns.zbasis, ns.sbasis, ns.Lbasis = function.chain([domain.basis('th-spline', degree=dualdegree, continuity=dualdegree-2).vector(2),
                                                           domain.basis('th-spline', degree=dualdegree-1, continuity=dualdegree-2),
                                                           [1,]])
 
@@ -114,13 +111,13 @@ def main(degree      = 2,
         ns.q   = 'sbasis_n ?dualtest_n'
         ns.l   = 'Lbasis_n ?dualtest_n'
 
-        # Shear traction
-        ns.t_j = 'mu (v_i,j + v_j,i) n_i -  mu (v_i,l + v_l,i) n_i n_l n_j'
+        # Goal quantity: pressure
+        ns.Q = 'q (1 + tanh( 100 (x_0 - x_1))) / 2'
 
         # nitsche term
         ns.nitsche  = 'mu ( (z_i,j + z_j,i) n_i) v_j + mu ( (v_i,j + v_j,i) n_i ) z_j - mu (beta / he) v_i z_i - s v_i n_i - q z_i n_i'
     
-        res = domain.boundary.integral('(t_i n_i) d:x' @ ns, degree=dualdegree*2)
+        res = domain.integral('Q d:x' @ ns, degree=dualdegree*2)
         res += domain.integral('(- mu (z_j,i + z_i,j) v_j,i + s v_k,k + q z_l,l ) d:x' @ ns, degree=dualdegree*2)
         res += domain.integral('(- l s - lh q ) d:x' @ ns, degree=dualdegree*2)
         res += domain.boundary.integral('nitsche d:x' @ns, degree=degree*2)
@@ -128,14 +125,18 @@ def main(degree      = 2,
         dualtrail = solver.solve_linear('dualtrail', res.derivative('dualtest'))
         ns = ns(dualtrail=dualtrail)
 
+        # boundary condition for projection
+        cons = domain.boundary.project(0, onto=ns.ubasis, geometry=geom, degree=degree*2)
+
+        # projection terms
         ns.Iz   = domain.projection(ns.z, ns.ubasis, geometry=geom, degree=degree*2, constrain=cons)
         ns.Is   = domain.projection(ns.s, ns.pbasis, geometry=geom, degree=degree*2)
 
         # Get errors
-        nelems[method]    += [len(domain)]
-        ndofs[method]     += [len(evalbasis)]
-        error_velocity[method] += [abs(domain.integrate(function.norm2('(uexact_i - uh_i) d:x' @ns), degree=degree*2))]
-        error_pressure[method] += [abs(domain.integrate('(pexact - ph) d:x' @ns, degree=degree*2))]
+        nelems[method] += [len(domain)]
+        ndofs[method]  += [len(evalbasis)]
+        err_u[method]  += [domain.integrate(function.norm2('(uexact_i - uh_i) d:x' @ns), degree=degree*2)]
+        err_p[method]  += [np.sqrt(domain.integrate('(pexact - ph)^2 d:x' @ns, degree=degree*2))]
 
         # indicators
         ns.moment = '(f_i + (uh_j,i + uh_i,j)_,j - ph_,i) (f_i + (uh_l,i + uh_i,l)_,l - ph_,i)'
@@ -151,50 +152,46 @@ def main(degree      = 2,
         z_int  = np.sqrt(indicater.integrate(domain, geom, degree, ns.zsharp, domain))
         s_int  = np.sqrt(indicater.integrate(domain, geom, degree, ns.ssharp, domain))
 
-        plotter.plot_solution('pressure', domain, geom, ns.ph)
-        plotter.plot_solution('exactpressure', domain, geom, ns.pexact)
+        #plotter.plot_mesh(method+'mesh'+str(nref), domain, geom)
+        plotter.plot_solution(method+'pressure'+str(nref), domain, geom, ns.ph, alpha=0.4)
+        #plotter.plot_solution(method+'dualpressure'+str(nref), domain, geom, ns.s)
+        #plotter.plot_streamlines(method+'dualvelocity'+str(nref), domain, geom, ns, ns.z)
 
         if method == 'goaloriented':
             
             indicators = incomp*s_int + moment*z_int 
-            #plotter.plot_indicators(method+'contributions_'+str(nref), domain, geom, {'Momentum':moment,'z_sharp':z_int,'incompressibility':incomp,'s_sharp':s_int}, normalize=False)
-            #plotter.plot_indicators(method+'indicators_'+str(nref), domain, geom, {'indicator':indicators,'incomp':incomp*s_int,'momentum':moment*z_int}, normalize=False)
-            domain, refined = refiner.refine(domain, indicators, num, evalbasis, maxlevel=maxreflevel+uref, marker_type=None, select_type=None, refined_check=True)
-            plotter.plot_mesh(method+'mesh'+str(nref), domain, geom)
+            plotter.plot_indicators(method+'contributions_'+str(nref), domain, geom, {'Momentum':moment,'z_sharp':z_int,'incompressibility':incomp,'s_sharp':s_int}, normalize=False, alpha=0.5)
+            plotter.plot_indicators(method+'indicators_'+str(nref), domain, geom, {'indicator':indicators,'incomp':incomp*s_int,'momentum':moment*z_int}, normalize=False, alpha=0.5)
+            domain, refined = refiner.refine(domain, indicators, num, evalbasis, maxlevel=maxreflevel+uref, marker_type=None, select_type='same_level', refined_check=True)
 
         if method == 'residualbased':
 
             indicators = incomp*h + moment*h 
-            #plotter.plot_indicators(method+'indicators_'+str(nref), domain, geom, {'indicator':indicators,'incomp':incomp*h,'momentum':moment*h}, normalize=False)
-            domain, refined = refiner.refine(domain, indicators, num, evalbasis, maxlevel=maxreflevel+uref, marker_type=None, select_type=None, refined_check=True)
-            plotter.plot_mesh(method+'mesh'+str(nref), domain, geom)
+            plotter.plot_indicators(method+'indicators_'+str(nref), domain, geom, {'indicator':indicators,'incomp':incomp*h,'momentum':moment*h}, normalize=False)
+            domain, refined = refiner.refine(domain, indicators, num, evalbasis, maxlevel=maxreflevel+uref, marker_type=None, select_type='same_level', refined_check=True)
 
         if method == 'uniform':
             domain = domain.refine(1)
             refined = True
             if nref == maxuref:
                 refined = False                    
-            if not refined:
-                break
+
+        if not refined:
+            break
     
         #### Post-processing ###
+    plotter.plot_mesh('mesh', domain, geom)
 
-    #plotter.plot_convergence('Exact_error',ndofs,error_velocity,labels=['dofs','Exact velocity error'],slopemarker=True)
-    #plotter.plot_convergence('Exact_error',ndofs,error_pressure,labels=['dofs','Exact pressure error'],slopemarker=True)
-    #plotter.plot_convergence('Dofs_vs_elems',nelems,ndofs,labels=['nelems','ndofs'])
+    plotter.plot_convergence('Exact_error',ndofs,err_u,labels=['dofs','Exact velocity error'])
+    plotter.plot_convergence('Exact_error',ndofs,err_p,labels=['dofs','Exact pressure error'])
+    plotter.plot_convergence('Dofs_vs_elems',nelems,ndofs,labels=['nelems','ndofs'])
     
-    plotter.plot_solution('pressure', domain, geom, ns.ph)
-    plotter.plot_streamlines('velocity', domain, geom, ns, ns.uh)
-    #plotter.plot_solution('dual_pressure', domain, geom, ns.s)
-    #plotter.plot_streamlines('dual_velocity', domain, geom, ns, ns.z)
-    #plotter.plot_streamlines('traction', domain, geom, ns, ns.traction)
+    plotter.plot_streamlines('solution_velocity', domain, geom, ns, ns.uh)
+    plotter.plot_solution('exact_pressure', domain, geom, ns.pexact)
+    plotter.plot_streamlines('exact_velocity', domain, geom, ns, ns.uexact)
 
-    #ns.gradp_i = 'pexact_,i'
-    #ns.gradph_i = 'ph_,i'
-    #plotter.plot_streamlines('gradpressureexact', domain, geom, ns, ns.gradp)
-    #plotter.plot_streamlines('gradpressure', domain, geom, ns, ns.gradph)
-    #plotter.plot_streamlines('body_force', domain, geom, ns, ns.f)
-    #plotter.plot_streamlines('als_body_force', domain, geom, ns, ns.falt)
+    plotter.plot_solution('dual_pressure', domain, geom, ns.s)
+    plotter.plot_streamlines('dual_velocity', domain, geom, ns, ns.z)
 
 with config(verbose=3,nprocs=6):
     cli.run(main)

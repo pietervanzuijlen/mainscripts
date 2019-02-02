@@ -6,16 +6,19 @@ import matplotlib.pyplot as plt
 from matplotlib import collections
 
 def main(degree     = 2,        # polynomial degree of pressure and velocity field
-         uref       = 2,        # amount of uniform refinements before solving the problem
-         refinements= 4,        # amount of refinement steps
+         uref       = 1,        # amount of uniform refinements before solving the problem
+         refinements= 3,        # amount of refinement steps
          num        = 0.5,      # quantity indicating the amount of refinement each step
          nelem      = 4,        # amount of elements in the initial grid
          maxreflevel= 4,        # maximum level of refinements
          maxrefine  = 3,        # refinement level for the trimming operation
+         beta       = 20,       # nitsche control parameter
+         gamma      = 0.00005,  # skeleton control parameter
+         alpha      = 0.000005, # ghost control parameter
          ):
 
     methods = ['goaloriented','residualbased','uniform']
-    methods = ['uniform']
+    methods = ['goaloriented']
 
     nelems       = {} 
     ndofs        = {} 
@@ -40,6 +43,8 @@ def main(degree     = 2,        # polynomial degree of pressure and velocity fie
     domain = domain.trim(function.norm2((x0,x1-1))-rc,     maxrefine=maxrefine)
     domain = domain.trim(function.norm2((x0-M0,x1-M1))-rm, maxrefine=maxrefine)
 
+    skeleton, ghost = domainmaker.skelghost(grid, domain)
+
     for method in methods:
 
       nelems[method] = []
@@ -50,12 +55,6 @@ def main(degree     = 2,        # polynomial degree of pressure and velocity fie
       for nref in range(refinements):
 
         # Defining the background and skeleton 
-        skeleton, ghost = domainmaker.skelghost(grid, domain)
-
-        # Plotting mesh, skeleton and ghost
-        plotter.plot_mesh('mesh_'+str(nref), domain, geom)
-        plotter.plot_interfaces('skeleton',domain,geom,skeleton)
-        plotter.plot_interfaces('ghost',domain,geom,ghost)
 
         ns = function.Namespace()
 
@@ -74,11 +73,11 @@ def main(degree     = 2,        # polynomial degree of pressure and velocity fie
         ns.hF = function.elemwise(domain.transforms, hF)
 
         # Problem parameters
-        ns.mu   = 1 
-        ns.beta = 1 
-        ns.gskel  = 0.05
-        ns.gghost = 0.005
-        ns.x    = geom
+        ns.mu     = 1 
+        ns.beta   = beta
+        ns.gskel  = gamma 
+        ns.gghost = alpha
+        ns.x      = geom
    
         ######################
         ### Primal problem ###
@@ -103,10 +102,7 @@ def main(degree     = 2,        # polynomial degree of pressure and velocity fie
         ns.stress_ij = 'mu (u_i,j + u_j,i) - p δ_ij'
 
         # Inflow boundary condition
-        ns.g_n = 'n_n'
-    
-        # nitsche term
-        ns.nitsche  = '-mu ( (u_i,j + u_j,i) n_i) v_j + ( (v_i,j + v_j,i) n_i ) u_j + mu (beta / he) v_i u_i + p v_i n_i - q u_i n_i'
+        ns.g_n = '-n_n'
     
         # Getting skeleton and ghost stabilization terms
         norm_derivative  = '({val}_,{i} n_{i})'
@@ -125,12 +121,15 @@ def main(degree     = 2,        # polynomial degree of pressure and velocity fie
         ns.skeleton = 'gskel mu^-1 hF^{} [[{}]] [[{}]]'.format(2*degree+1, jumpp, jumpq)
         ns.ghost    = 'gghost  mu hF^{} [[{}]] [[{}]]'.format(2*degree-1, jumpu, jumpv)
 
+        # nitsche term
+        ns.nitsche  = 'mu ( (u_i,j + u_j,i) n_i) v_j + mu ( (v_i,j + v_j,i) n_i ) u_j - mu (beta / he) v_i u_i - p v_i n_i - q u_i n_i'
+
         # Defining the residual
         res = domain.boundary['left'].integral('(g_i v_i) d:x' @ ns, degree=degree*2)
-        res -= domain.integral('(stress_ij v_i,j - q u_l,l) d:x' @ ns, degree=degree*2)
-        res -= domain.boundary['top,bottom,trimmed'].integral('nitsche d:x' @ns, degree=degree*2)
-        res -= skeleton.integral('skeleton d:x' @ns, degree=degree*2)
-        res -= ghost.integral('ghost d:x' @ns, degree=degree*2)
+        res += domain.integral('(- stress_ij v_i,j + q u_l,l) d:x' @ ns, degree=degree*2)
+        res += domain.boundary['top,bottom,trimmed'].integral('nitsche d:x' @ns, degree=degree*2)
+        res += skeleton.integral('skeleton d:x' @ns, degree=degree*2)
+        res += ghost.integral('ghost d:x' @ns, degree=degree*2)
                 
         # Solving the primal solution
         trail = solver.solve_linear('trail', res.derivative('test'))
@@ -155,8 +154,6 @@ def main(degree     = 2,        # polynomial degree of pressure and velocity fie
         ns.v_i = 'zbasis_ni ?dualtest_n'
         ns.q = 'sbasis_n ?dualtest_n'
         
-        # nitsche term
-        ns.nitsche  = '-mu ( (z_i,j + z_j,i) n_i) v_j + ( (v_i,j + v_j,i) n_i ) z_j + mu (beta / he) v_i z_i - s v_i n_i + q z_i n_i'
     
         # Getting skeleton and ghost stabilization terms
         norm_derivative  = '({val}_,{i} n_{i})'
@@ -175,21 +172,24 @@ def main(degree     = 2,        # polynomial degree of pressure and velocity fie
         ns.skeleton = 'gskel mu^-1 hF^{} [[{}]] [[{}]]'.format(2*dualdegree+1, jumpq, jumps)
         ns.ghost    = 'gghost  mu hF^{} [[{}]] [[{}]]'.format(2*dualdegree-1, jumpv, jumpz)
     
+        # nitsche term
+        ns.nitsche  = 'mu ( (z_i,j + z_j,i) n_i) v_j + mu ( (v_i,j + v_j,i) n_i ) z_j - mu (beta / he) v_i z_i - s v_i n_i - q z_i n_i'
+
         # Defining residual for the dual problem
         res = domain.boundary['right'].integral('(n_i v_i) d:x' @ ns, degree=dualdegree*2)
-        res -= domain.integral('(mu (z_j,i + z_i,j) v_j,i - s v_k,k - q z_l,l) d:x' @ ns, degree=dualdegree*2)
-        res -= domain.boundary['top,bottom,trimmed'].integral('nitsche d:x' @ns, degree=dualdegree*2)
-        res -= skeleton.integral('skeleton d:x' @ns, degree=dualdegree*2)
-        res -= ghost.integral('ghost d:x' @ns, degree=dualdegree*2)
+        res += domain.integral('(-mu (z_j,i + z_i,j) v_j,i + s v_k,k + q z_l,l) d:x' @ ns, degree=dualdegree*2)
+        res += domain.boundary['top,bottom,trimmed'].integral('nitsche d:x' @ns, degree=dualdegree*2)
+        res += skeleton.integral('skeleton d:x' @ns, degree=dualdegree*2)
+        res += ghost.integral('ghost d:x' @ns, degree=dualdegree*2)
 
         # Solving the dual problem
         dualtrail = solver.solve_linear('dualtrail', res.derivative('dualtest'))
         ns = ns(dualtrail=dualtrail) 
 
         # Calculating the projection values (no boundary condition included
-        ns.Iz   = domain.projection(ns.z, ns.ubasis, geometry=geom, degree=dualdegree*2)
+        cons = domain.boundary['top,bottom,trimmed'].project(0, onto=ns.ubasis, geometry=geom, degree=degree*2)
+        ns.Iz   = domain.projection(ns.z, ns.ubasis, geometry=geom, degree=dualdegree*2, constrain=cons)
         ns.Is   = domain.projection(ns.s, ns.pbasis, geometry=geom, degree=dualdegree*2)
-
 
         # Error values for convergence
         nelems[method]    += [len(domain)]
@@ -229,8 +229,6 @@ def main(degree     = 2,        # polynomial degree of pressure and velocity fie
         if method == 'goaloriented':
 
             # Assemble indicaters
-            rz = z_int + z_jump + z_inflow + z_outflow
-    
             inter = incom*s_int + force*z_int
             iface = jump*z_jump
             bound = inflow*z_inflow + outflow*z_outflow
@@ -242,14 +240,37 @@ def main(degree     = 2,        # polynomial degree of pressure and velocity fie
             plotter.plot_indicators('sharp_contributions_'+str(nref), domain, geom, {'z_internal':z_int,'s_internal':s_int,'z_interfaces':z_jump,'z_boundaries':z_inflow+z_outflow}, normalize=False)
             plotter.plot_indicators('indicators_'+'_'+str(nref), domain, geom, {'indicator':indicators,'internal':inter,'interfaces':iface,'boundaries':bound}, normalize=False)
     
-            domain, refined = refiner.refine(domain, indicators, num, evalbasis, maxlevel=maxreflevel+uref, marker_type=None, select_type=None, refined_check=True)
+            domain, grid, refined = refiner.refine(domain, indicators, num, evalbasis, maxlevel=maxreflevel+uref, grid=grid, marker_type=None, select_type=None)
             print('Find a way to refine grid as well')
 
-        elif method == 'uniform':
+        if method == 'residualbased':
+
+            # assemble indicaters
+            inter = (incom + force)*h
+            iface = jump*np.sqrt(h)
+            bound = (inflow + outflow)*np.sqrt(h)
+
+            indicators =  inter + iface + bound 
+
+            plotter.plot_indicators('residual_contributions_'+str(nref), domain, geom, {'force':force*h,'incompressibility':incom*h,'interfaces':jump*np.sqrt(h),'boundaries':(inflow+outflow)*np.sqrt(h)}, normalize=False)
+            plotter.plot_indicators('indicators_'+method+'_'+str(nref), domain, geom, {'indicator':indicators})
+            
+            domain, grid, refined = refiner.refine(domain, indicators, num, evalbasis, maxlevel=maxreflevel+uref, grid=grid, marker_type=None, select_type=None)
+
+        if method == 'uniform':
 
             domain = domain.refine(1)
             grid = grid.refine(1)
+            refined = True
 
+            if nref == maxuref:
+                refined = False                    
+
+        # Stop with the refinement loop if nothing is refined
+        if not refined:
+            break
+
+        #plotter.plot_levels(method+'mesh_'+str(nref), domain, geom, minlvl=uref)
         plotter.plot_streamlines('velocity_'+str(nref), domain, geom, ns, ns.u)
         plotter.plot_solution('pressure'+str(nref), domain, geom, ns.p)
 

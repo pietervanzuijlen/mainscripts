@@ -7,12 +7,12 @@ import numpy as np
 from utilities import *
 
 def main(degree      = 2,
-         maxref      = 20,
+         maxref      = 2,
          npoints     = 5,
-         num         = 0.5,
+         num         = 0.2,
          uref        = 2,
          maxreflevel = 7,
-         maxuref     = 4):
+         maxuref     = 3):
 
     methods = ['goaloriented','uniform','residualbased']
 
@@ -28,14 +28,18 @@ def main(degree      = 2,
         error_sol[method] = []
         error_qoi[method] = []
         
-        domain, geom = domainmaker.lshape(uref=uref, width=2, height=2)
+        #domain, geom = domainmaker.lshape_single(uref=3, width=2, height=2)
+        domain, geom = domainmaker.lshape(uref=3, width=2, height=2)
         ns = function.Namespace()
+
+        plotter.plot_mesh('mesh',domain,geom)
 
         for nref in range(maxref):
             log.user(method+': '+str(nref))
             
             ### Primal problem ###
-            ns.basis = domain.basis('th-spline', degree=degree, patchcontinuous=True, continuity=degree-1)
+            #ns.basis = domain.basis('th-spline', degree=degree, patchcontinuous=True, continuity=degree-1)
+            ns.basis = domain.basis('th-spline', degree=degree, continuity=degree-1)
             ns.x = geom
             x, y = geom
             th = function.ArcTan2(y,x) 
@@ -54,12 +58,12 @@ def main(degree      = 2,
             ns.e  = 'u - uh'
         
             A    = domain.integrate(ns.eval_ij('basis_i,k basis_j,k d:x'), degree=degree*2)
-            b    = domain.boundary['patch1-top'].integrate(ns.eval_i('basis_i g1 d:x'), degree=degree*2)
-            b   += domain.boundary['patch1-right'].integrate(ns.eval_i('basis_i g2 d:x'), degree=degree*2)
-            b   += domain.boundary['patch0-right'].integrate(ns.eval_i('basis_i g3 d:x'), degree=degree*2)
-            b   += domain.boundary['patch0-bottom'].integrate(ns.eval_i('basis_i g4 d:x'), degree=degree*2)
+            b    = domain.boundary['left'].integrate(ns.eval_i('basis_i g1 d:x'), degree=degree*2)
+            b   += domain.boundary['top'].integrate(ns.eval_i('basis_i g2 d:x'), degree=degree*2)
+            b   += domain.boundary['right'].integrate(ns.eval_i('basis_i g3 d:x'), degree=degree*2)
+            b   += domain.boundary['bottom'].integrate(ns.eval_i('basis_i g4 d:x'), degree=degree*2)
     
-            cons = domain.boundary['patch0-left,patch1-left'].project(0, onto=ns.basis, geometry=geom, degree=degree*2)
+            cons = domain.boundary['inner'].project(0, onto=ns.basis, geometry=geom, degree=degree*2)
         
             lhs = A.solve(b, constrain=cons)
             ns = ns(lhs=lhs)
@@ -68,14 +72,16 @@ def main(degree      = 2,
     
             ### Dual problem ###
             dualdegree = degree + 1
-            ns.dualbasis = domain.basis('th-spline', degree=dualdegree, patchcontinuous=True, continuity=degree)
+            #ns.dualbasis = domain.basis('th-spline', degree=dualdegree, patchcontinuous=True, continuity=degree)
+            ns.dualbasis = domain.basis('th-spline', degree=dualdegree, continuity=degree)
     
             ns.z = 'dualbasis_n ?duallhs_n'
         
             B = domain.integrate(ns.eval_ij('dualbasis_i,k dualbasis_j,k d:x'), degree=dualdegree*2)
-            Q = domain.boundary['patch0-bottom'].boundary['right'].integrate(ns.eval_i('dualbasis_i d:x'), degree=dualdegree*2)
+            Q = domain.boundary['bottom'].boundary['top'].integrate(ns.eval_i('dualbasis_i d:x'), degree=dualdegree*2)
+
     
-            consdual = domain.boundary['patch0-left,patch1-left'].project(0, onto=ns.dualbasis, geometry=geom, degree=dualdegree*2)
+            consdual = domain.boundary['inner'].project(0, onto=ns.dualbasis, geometry=geom, degree=dualdegree*2)
         
             duallhs = B.solve(Q, constrain = consdual)
             ns      = ns(duallhs=duallhs)
@@ -88,14 +94,14 @@ def main(degree      = 2,
             
             nelems[method]    += [len(domain)]
             ndofs[method]     += [len(ns.basis)]
-            error_sol[method] += [abs(domain.integrate('(u - uh) d:x' @ns, degree=degree*2))]
-            error_qoi[method] += [abs(domain.boundary['patch0-bottom'].boundary['right'].integrate('(u - uh) d:x' @ ns , ischeme='gauss1'))]
+            error_sol[method] += [np.sqrt(domain.integrate('(u - uh)^2 d:x' @ns, degree=degree*2))]
+            error_qoi[method] += [np.sqrt(domain.boundary['bottom'].boundary['top'].integrate('(u - uh)^2 d:x' @ ns , ischeme='gauss1'))]
             ### Get errors ###
 
 
-            Rz  = domain.boundary['patch1-top'].integrate('g1  z d:x' @ns, degree=degree*2) + domain.boundary['patch1-right'].integrate('g2  z d:x' @ns, degree=degree*2) + domain.boundary['patch0-right'].integrate('g3  z d:x' @ns, degree=degree*2) + domain.boundary['patch0-bottom'].integrate('g4  z d:x' @ns, degree=degree*2) - domain.integrate('uh_,i z_,i d:x' @ns, degree=degree*2)
-            RIz = domain.boundary['patch1-top'].integrate('g1 Iz d:x' @ns, degree=degree*2) + domain.boundary['patch1-right'].integrate('g2 Iz d:x' @ns, degree=degree*2) + domain.boundary['patch0-right'].integrate('g3 Iz d:x' @ns, degree=degree*2) + domain.boundary['patch0-bottom'].integrate('g4 Iz d:x' @ns, degree=degree*2) - domain.integrate('uh_,i Iz_,i d:x' @ns, degree=degree*2)
-            Rz_Iz = domain.boundary['patch1-top'].integrate('g1 (z - Iz) d:x' @ns, degree=degree*2) + domain.boundary['patch1-right'].integrate('g2 (z - Iz) d:x' @ns, degree=degree*2) + domain.boundary['patch0-right'].integrate('g3 (z - Iz) d:x' @ns, degree=degree*2) + domain.boundary['patch0-bottom'].integrate('g4 (z - Iz) d:x' @ns, degree=degree*2) - domain.integrate('uh_,i (z - Iz)_,i d:x' @ns, degree=degree*2)
+            Rz  = domain.boundary['left'].integrate('g1  z d:x' @ns, degree=degree*2) + domain.boundary['top'].integrate('g2  z d:x' @ns, degree=degree*2) + domain.boundary['right'].integrate('g3  z d:x' @ns, degree=degree*2) + domain.boundary['bottom'].integrate('g4  z d:x' @ns, degree=degree*2) - domain.integrate('uh_,i z_,i d:x' @ns, degree=degree*2)
+            RIz = domain.boundary['left'].integrate('g1 Iz d:x' @ns, degree=degree*2) + domain.boundary['top'].integrate('g2 Iz d:x' @ns, degree=degree*2) + domain.boundary['right'].integrate('g3 Iz d:x' @ns, degree=degree*2) + domain.boundary['bottom'].integrate('g4 Iz d:x' @ns, degree=degree*2) - domain.integrate('uh_,i Iz_,i d:x' @ns, degree=degree*2)
+            Rz_Iz = domain.boundary['left'].integrate('g1 (z - Iz) d:x' @ns, degree=degree*2) + domain.boundary['top'].integrate('g2 (z - Iz) d:x' @ns, degree=degree*2) + domain.boundary['right'].integrate('g3 (z - Iz) d:x' @ns, degree=degree*2) + domain.boundary['bottom'].integrate('g4 (z - Iz) d:x' @ns, degree=degree*2) - domain.integrate('uh_,i (z - Iz)_,i d:x' @ns, degree=degree*2)
     
             #print('R(z)    :', Rz)
             #print('R(Iz)   :', RIz)
@@ -114,17 +120,17 @@ def main(degree      = 2,
 
             rint    = np.sqrt(indicater.integrate(domain, geom, degree, ns.rint, domain))
             rjump   = np.sqrt(indicater.integrate(domain, geom, degree, ns.rjump, domain.interfaces, interfaces=True))
-            rbound1 = np.sqrt(indicater.integrate(domain, geom, degree, ns.rbound1, domain.boundary['patch1-top']))
-            rbound2 = np.sqrt(indicater.integrate(domain, geom, degree, ns.rbound2, domain.boundary['patch1-right']))
-            rbound3 = np.sqrt(indicater.integrate(domain, geom, degree, ns.rbound3, domain.boundary['patch0-right']))
-            rbound4 = np.sqrt(indicater.integrate(domain, geom, degree, ns.rbound4, domain.boundary['patch0-bottom']))
+            rbound1 = np.sqrt(indicater.integrate(domain, geom, degree, ns.rbound1, domain.boundary['left']))
+            rbound2 = np.sqrt(indicater.integrate(domain, geom, degree, ns.rbound2, domain.boundary['top']))
+            rbound3 = np.sqrt(indicater.integrate(domain, geom, degree, ns.rbound3, domain.boundary['right']))
+            rbound4 = np.sqrt(indicater.integrate(domain, geom, degree, ns.rbound4, domain.boundary['bottom']))
     
             rz_int    = np.sqrt(indicater.integrate(domain, geom, degree, ns.rz, domain))
             rz_jump   = np.sqrt(indicater.integrate(domain, geom, degree, ns.rz, domain.interfaces, interfaces=True))
-            rz_bound1 = np.sqrt(indicater.integrate(domain, geom, degree, ns.rz, domain.boundary['patch1-top']))
-            rz_bound2 = np.sqrt(indicater.integrate(domain, geom, degree, ns.rz, domain.boundary['patch1-right']))
-            rz_bound3 = np.sqrt(indicater.integrate(domain, geom, degree, ns.rz, domain.boundary['patch0-right']))
-            rz_bound4 = np.sqrt(indicater.integrate(domain, geom, degree, ns.rz, domain.boundary['patch0-bottom']))
+            rz_bound1 = np.sqrt(indicater.integrate(domain, geom, degree, ns.rz, domain.boundary['left']))
+            rz_bound2 = np.sqrt(indicater.integrate(domain, geom, degree, ns.rz, domain.boundary['top']))
+            rz_bound3 = np.sqrt(indicater.integrate(domain, geom, degree, ns.rz, domain.boundary['right']))
+            rz_bound4 = np.sqrt(indicater.integrate(domain, geom, degree, ns.rz, domain.boundary['bottom']))
 
             rz = rz_int + rz_jump + rz_bound1 + rz_bound2 + rz_bound3 + rz_bound4
             ### Get indicaters ###
@@ -163,6 +169,7 @@ def main(degree      = 2,
             if method == 'uniform':
 
                 domain = domain.refine(1)
+                refined = True
 
                 if nref == maxuref:
                     break
@@ -171,6 +178,9 @@ def main(degree      = 2,
                 break
             ### Refine mesh ###
         plotter.plot_mesh('mesh_'+method, domain, geom)
+        plotter.plot_solution('solution_'+method, domain, geom, ns.uh)
+        plotter.plot_solution('exact_'+method, domain, geom, ns.u)
+
     
     plotter.plot_convergence('Exact_error',ndofs,error_sol,labels=['dofs','Exact error'],slopemarker=True)
     plotter.plot_convergence('Error_in_QoI',ndofs,error_qoi,labels=['dofs','Error in QoI'],slopemarker=True)
