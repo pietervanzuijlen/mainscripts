@@ -158,14 +158,14 @@ def main(degree      = 3,
             if method == 'goaloriented':
                 
                 indicators = incomp*s_int + moment*z_int 
-                #plotter.plot_indicators(method+'contributions_'+str(nref), domain, geom, {'Momentum':moment,'z_sharp':z_int,'incompressibility':incomp,'s_sharp':s_int}, normalize=False, alpha=0.5)
+                #plotter.plot_indicators(method+'contributions_'+str(nref), domain, geom, {'Momentum':moment,'z_sharp':z_int,'incompressibility':incomp,'s_sharp':s_int}, normalize=False, alpha=0.5, alpha=0.5)
                 plotter.plot_indicators(method+'indicators_'+str(nref), domain, geom, {'indicator':indicators,'incomp':incomp*s_int,'momentum':moment*z_int}, normalize=False, alpha=0.5)
                 domain, refined = refiner.refine(domain, indicators, num, evalbasis, maxlevel=maxreflevel+uref, marker_type=None, select_type='same_level')
     
             if method == 'residualbased':
     
                 indicators = incomp*h + moment*h 
-                plotter.plot_indicators(method+'indicators_'+str(nref), domain, geom, {'indicator':indicators,'incomp':incomp*h,'momentum':moment*h}, normalize=False)
+                plotter.plot_indicators(method+'indicators_'+str(nref), domain, geom, {'indicator':indicators,'incomp':incomp*h,'momentum':moment*h}, normalize=False, alpha=0.5)
                 domain, refined = refiner.refine(domain, indicators, num, evalbasis, maxlevel=maxreflevel+uref, marker_type=None, select_type='same_level')
     
             if method == 'uniform':

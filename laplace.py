@@ -7,7 +7,7 @@ import numpy as np
 from utilities import *
 
 def main(degree      = 2,
-         maxref      = 2,
+         refinements = 15,
          npoints     = 5,
          num         = 0.2,
          uref        = 2,
@@ -28,18 +28,16 @@ def main(degree      = 2,
         error_sol[method] = []
         error_qoi[method] = []
         
-        #domain, geom = domainmaker.lshape_single(uref=3, width=2, height=2)
-        domain, geom = domainmaker.lshape(uref=3, width=2, height=2)
+        domain, geom = domainmaker.lshape_mpatch(uref=3, width=2, height=2)
+        #domain, geom = domainmaker.lshape_trim(uref=3, width=2, height=2)
         ns = function.Namespace()
 
-        plotter.plot_mesh('mesh',domain,geom)
-
-        for nref in range(maxref):
+        for nref in range(refinements):
             log.user(method+': '+str(nref))
             
             ### Primal problem ###
-            #ns.basis = domain.basis('th-spline', degree=degree, patchcontinuous=True, continuity=degree-1)
-            ns.basis = domain.basis('th-spline', degree=degree, continuity=degree-1)
+            ns.basis = domain.basis('th-spline', degree=degree, patchcontinuous=True, continuity=degree-1)
+            #ns.basis = domain.basis('th-spline', degree=degree, continuity=degree-1)
             ns.x = geom
             x, y = geom
             th = function.ArcTan2(y,x) 
@@ -72,13 +70,14 @@ def main(degree      = 2,
     
             ### Dual problem ###
             dualdegree = degree + 1
-            #ns.dualbasis = domain.basis('th-spline', degree=dualdegree, patchcontinuous=True, continuity=degree)
-            ns.dualbasis = domain.basis('th-spline', degree=dualdegree, continuity=degree)
+            ns.dualbasis = domain.basis('th-spline', degree=dualdegree, patchcontinuous=True, continuity=degree)
+            #ns.dualbasis = domain.basis('th-spline', degree=dualdegree, continuity=degree)
     
             ns.z = 'dualbasis_n ?duallhs_n'
         
             B = domain.integrate(ns.eval_ij('dualbasis_i,k dualbasis_j,k d:x'), degree=dualdegree*2)
-            Q = domain.boundary['bottom'].boundary['top'].integrate(ns.eval_i('dualbasis_i d:x'), degree=dualdegree*2)
+            #Q = domain.boundary['bottom'].boundary['top'].integrate(ns.eval_i('dualbasis_i d:x'), degree=dualdegree*2)
+            Q = domain.boundary['bottom'].boundary['right'].integrate(ns.eval_i('dualbasis_i d:x'), degree=dualdegree*2)
 
     
             consdual = domain.boundary['inner'].project(0, onto=ns.dualbasis, geometry=geom, degree=dualdegree*2)
@@ -95,13 +94,13 @@ def main(degree      = 2,
             nelems[method]    += [len(domain)]
             ndofs[method]     += [len(ns.basis)]
             error_sol[method] += [np.sqrt(domain.integrate('(u - uh)^2 d:x' @ns, degree=degree*2))]
-            error_qoi[method] += [np.sqrt(domain.boundary['bottom'].boundary['top'].integrate('(u - uh)^2 d:x' @ ns , ischeme='gauss1'))]
+            error_qoi[method] += [np.sqrt(domain.boundary['bottom'].boundary['right'].integrate('(u - uh)^2 d:x' @ ns , ischeme='gauss1'))]
             ### Get errors ###
 
 
-            Rz  = domain.boundary['left'].integrate('g1  z d:x' @ns, degree=degree*2) + domain.boundary['top'].integrate('g2  z d:x' @ns, degree=degree*2) + domain.boundary['right'].integrate('g3  z d:x' @ns, degree=degree*2) + domain.boundary['bottom'].integrate('g4  z d:x' @ns, degree=degree*2) - domain.integrate('uh_,i z_,i d:x' @ns, degree=degree*2)
-            RIz = domain.boundary['left'].integrate('g1 Iz d:x' @ns, degree=degree*2) + domain.boundary['top'].integrate('g2 Iz d:x' @ns, degree=degree*2) + domain.boundary['right'].integrate('g3 Iz d:x' @ns, degree=degree*2) + domain.boundary['bottom'].integrate('g4 Iz d:x' @ns, degree=degree*2) - domain.integrate('uh_,i Iz_,i d:x' @ns, degree=degree*2)
-            Rz_Iz = domain.boundary['left'].integrate('g1 (z - Iz) d:x' @ns, degree=degree*2) + domain.boundary['top'].integrate('g2 (z - Iz) d:x' @ns, degree=degree*2) + domain.boundary['right'].integrate('g3 (z - Iz) d:x' @ns, degree=degree*2) + domain.boundary['bottom'].integrate('g4 (z - Iz) d:x' @ns, degree=degree*2) - domain.integrate('uh_,i (z - Iz)_,i d:x' @ns, degree=degree*2)
+            #Rz  = domain.boundary['left'].integrate('g1  z d:x' @ns, degree=degree*2) + domain.boundary['top'].integrate('g2  z d:x' @ns, degree=degree*2) + domain.boundary['right'].integrate('g3  z d:x' @ns, degree=degree*2) + domain.boundary['bottom'].integrate('g4  z d:x' @ns, degree=degree*2) - domain.integrate('uh_,i z_,i d:x' @ns, degree=degree*2)
+            #RIz = domain.boundary['left'].integrate('g1 Iz d:x' @ns, degree=degree*2) + domain.boundary['top'].integrate('g2 Iz d:x' @ns, degree=degree*2) + domain.boundary['right'].integrate('g3 Iz d:x' @ns, degree=degree*2) + domain.boundary['bottom'].integrate('g4 Iz d:x' @ns, degree=degree*2) - domain.integrate('uh_,i Iz_,i d:x' @ns, degree=degree*2)
+            #Rz_Iz = domain.boundary['left'].integrate('g1 (z - Iz) d:x' @ns, degree=degree*2) + domain.boundary['top'].integrate('g2 (z - Iz) d:x' @ns, degree=degree*2) + domain.boundary['right'].integrate('g3 (z - Iz) d:x' @ns, degree=degree*2) + domain.boundary['bottom'].integrate('g4 (z - Iz) d:x' @ns, degree=degree*2) - domain.integrate('uh_,i (z - Iz)_,i d:x' @ns, degree=degree*2)
     
             #print('R(z)    :', Rz)
             #print('R(Iz)   :', RIz)
@@ -148,10 +147,9 @@ def main(degree      = 2,
 
                 #plotter.plot_indicators('residual_contributions_'+str(nref), domain, geom, {'internal':rint,'interfaces':rjump,'boundary':rbound1+rbound2+rbound3+rbound4})
                 #plotter.plot_indicators('sharp_contributions_'+str(nref), domain, geom, {'internal':rz_int,'interfaces':rz_jump,'boundary':rz_bound1+rz_bound2+rz_bound3+rz_bound4})
-                #plotter.plot_indicators('indicators_'+method+'_'+str(nref), domain, geom, {'indicator':indicators,'internal':inter,'interfaces':jump,'boundary':bound})
-                #plotter.plot_mesh('mesh_'+str(nref), domain, geom)
+                plotter.plot_indicators('indicators_'+method+'_'+str(nref), domain, geom, {'indicator':indicators,'internal':inter,'interfaces':jump,'boundary':bound}, alpha=.5)
 
-                domain, refined = refiner.refine(domain, indicators, num, ns.basis, maxlevel=10, marker_type=None, select_type='same_level', refined_check=True)
+                domain, refined = refiner.refine(domain, indicators, num, ns.basis, maxlevel=maxreflevel, marker_type=None, select_type='same_level')
 
             if method == 'residualbased':
 
@@ -162,9 +160,8 @@ def main(degree      = 2,
 
                 indicators =  inter + jump + bound 
 
-                #plotter.plot_indicators('indicators_'+method+'_'+str(nref), domain, geom, {'indicator':indicators})
-                #plotter.plot_mesh('mesh_'+str(nref), domain, geom)
-                domain, refined = refiner.refine(domain, indicators, num, ns.basis, maxlevel=10, marker_type=None, select_type='same_level', refined_check=True)
+                plotter.plot_indicators('indicators_'+method+'_'+str(nref), domain, geom, {'indicator':indicators}, alpha=.5)
+                domain, refined = refiner.refine(domain, indicators, num, ns.basis, maxlevel=maxreflevel, marker_type=None, select_type='same_level')
 
             if method == 'uniform':
 
@@ -178,10 +175,10 @@ def main(degree      = 2,
                 break
             ### Refine mesh ###
         plotter.plot_mesh('mesh_'+method, domain, geom)
-        plotter.plot_solution('solution_'+method, domain, geom, ns.uh)
-        plotter.plot_solution('exact_'+method, domain, geom, ns.u)
-
     
+        writer.write('../results/stokes/corner', {'degree':degree, 'uref':uref, 'maxuref':maxuref, 'refinements':refinements, 'num':num},
+                     ndofs=ndofs, nelems=nelems, error_sol=error_sol, error_qoi=error_qoi)
+
     plotter.plot_convergence('Exact_error',ndofs,error_sol,labels=['dofs','Exact error'],slopemarker=True)
     plotter.plot_convergence('Error_in_QoI',ndofs,error_qoi,labels=['dofs','Error in QoI'],slopemarker=True)
     plotter.plot_convergence('Dofs_vs_elems',nelems,ndofs,labels=['nelems','ndofs'])
