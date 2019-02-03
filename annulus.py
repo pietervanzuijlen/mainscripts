@@ -7,9 +7,9 @@ import numpy as np
 import sys
 
 def main(degree      = 3,
-         refinements = 20,
+         refinements = 15,
          npoints     = 5,
-         num         = 0.75,
+         num         = 0.50,
          uref        = 3,
          maxreflevel = 8,
          maxuref     = 4,
@@ -179,6 +179,9 @@ def main(degree      = 3,
         
         #### Post-processing ###
         plotter.plot_mesh('mesh', domain, geom)
+
+        writer.write('../results/annulus/halfpressure', {'degree':degree, 'uref':uref, 'maxuref':maxuref, 'refinements':refinements, 'num':num, 'beta':beta},
+                     ndofs=ndofs, nelems=nelems, err_u=err_u, err_p=err_p, err_Q=err_Q)
 
     plotter.plot_convergence('Exact_error_velocity',ndofs,err_u,labels=['dofs','Exact velocity error'])
     plotter.plot_convergence('Exact_error_pressure',ndofs,err_p,labels=['dofs','Exact pressure error'])
