@@ -1,13 +1,13 @@
 '''
-In this code different forms of adaptivity are tested on an lshaped domain on which a laplace problem is solved. The exact solution to this problem is known. Goal-oriented, residual-based and uniform refinement will be tested and compared. Utilities toolbox is used.
+LAPLACE: In this code different forms of adaptivity are tested on an lshaped domain on which a laplace problem is solved. The exact solution to this problem is known. Goal-oriented, residual-based and uniform refinement will be tested and compared. Utilities toolbox is used.  
+''' 
 
-'''
-from   nutils import *
+from nutils import * 
 import numpy as np
 from utilities import *
 
 def main(degree      = 2,
-         refinements = 15,
+         refinements = 3,
          npoints     = 5,
          num         = 0.2,
          uref        = 2,
@@ -29,8 +29,16 @@ def main(degree      = 2,
         error_qoi[method] = []
         
         domain, geom = domainmaker.lshape_mpatch(uref=3, width=2, height=2)
+
         #domain, geom = domainmaker.lshape_trim(uref=3, width=2, height=2)
         ns = function.Namespace()
+        ns.x = geom
+        ns.eps = np.mean(domain.integrate_elementwise(function.J(geom), degree=degree))/4
+        ns.x0 = '(x_0 - 1)^2 + (x_1 + 1)^2 - eps^2'
+        ns.x1 = function.min(ns.x0, 0)
+        ns.k1 = 'exp( - x1 / eps^2 )'
+        ns.C = 1/domain.integrate('k1 d:x' @ns, degree=degree*2)
+        ns.k2 = 'C exp( - x1 / eps^2 )'
 
         for nref in range(refinements):
             log.user(method+': '+str(nref))
@@ -38,7 +46,6 @@ def main(degree      = 2,
             ### Primal problem ###
             ns.basis = domain.basis('th-spline', degree=degree, patchcontinuous=True, continuity=degree-1)
             #ns.basis = domain.basis('th-spline', degree=degree, continuity=degree-1)
-            ns.x = geom
             x, y = geom
             th = function.ArcTan2(y,x) 
             R  = (x**2 + y**2)**.5
@@ -76,8 +83,11 @@ def main(degree      = 2,
             ns.z = 'dualbasis_n ?duallhs_n'
         
             B = domain.integrate(ns.eval_ij('dualbasis_i,k dualbasis_j,k d:x'), degree=dualdegree*2)
+
+
             #Q = domain.boundary['bottom'].boundary['top'].integrate(ns.eval_i('dualbasis_i d:x'), degree=dualdegree*2)
-            Q = domain.boundary['bottom'].boundary['right'].integrate(ns.eval_i('dualbasis_i d:x'), degree=dualdegree*2)
+            #Q = domain.boundary['bottom'].boundary['right'].integrate(ns.eval_i('dualbasis_i d:x'), degree=dualdegree*2)
+            Q = domain.integrate(ns.eval_i('k2 dualbasis_i d:x'), degree=dualdegree*2)
 
     
             consdual = domain.boundary['inner'].project(0, onto=ns.dualbasis, geometry=geom, degree=dualdegree*2)
@@ -174,9 +184,9 @@ def main(degree      = 2,
             if not refined:
                 break
             ### Refine mesh ###
-        plotter.plot_mesh('mesh_'+method, domain, geom)
+        plotter.plot_mesh(method+'mesh', domain, geom)
     
-        writer.write('../results/stokes/corner', {'degree':degree, 'uref':uref, 'maxuref':maxuref, 'refinements':refinements, 'num':num},
+        writer.write('../results/laplace/'+method+'mollification', {'degree':degree, 'uref':uref, 'maxuref':maxuref, 'refinements':refinements, 'num':num},
                      ndofs=ndofs, nelems=nelems, error_sol=error_sol, error_qoi=error_qoi)
 
     plotter.plot_convergence('Exact_error',ndofs,error_sol,labels=['dofs','Exact error'],slopemarker=True)
