@@ -4,15 +4,14 @@ import numpy as np
 
 def main(degree      = 3,
          uref        = 1,
-         refinements = 5,
+         refinements = 10,
          num         = 0.5,
          npoints     = 5,
-         maxreflevel = 5,
+         maxreflevel = 6,
          maxuref     = 3,
          beta        = 50,):
 
     methods = ['goaloriented','residualbased','uniform']
-    methods = ['goaloriented']
 
     nelems    = {} 
     ndofs     = {} 
@@ -127,10 +126,10 @@ def main(degree      = 3,
             #error_qoi[method]    += [abs(Rz)]
             #error_zincomp[method] += [abs(Rs)]
 
-            ns.momentum_i = 'mu (u_i,j + u_j,i)_,j + p_,i'
-            ns.force_i    = 'mu (u_i,j + u_j,i)_,j'
-            ns.presgrad_i = 'p_,i'
-            plotter.plot_streamlines('momentum',domain,geom,ns,ns.momentum)
+            #ns.momentum_i = 'mu (u_i,j + u_j,i)_,j + p_,i'
+            #ns.force_i    = 'mu (u_i,j + u_j,i)_,j'
+            #ns.presgrad_i = 'p_,i'
+            #plotter.plot_streamlines('momentum',domain,geom,ns,ns.momentum)
             #plotter.plot_streamlines('force',domain,geom,ns,ns.force)
             #plotter.plot_streamlines('presgrad',domain,geom,ns,ns.presgrad)
 
@@ -184,9 +183,10 @@ def main(degree      = 3,
 
                 indicators =  inter + iface + bound 
 
-                plotter.plot_indicators('indicators_'+method+'_'+str(nref), domain, geom, {'indicator':indicators,'internal':inter,'interfaces':iface,'boundaries':bound}, normalize=False, alpha=.5)
+                plotter.plot_indicators('indicators_'+method+'_'+str(nref), domain, geom, {'indicator':indicators,'unweighted_indicators':incom+force+jump+inflow}, normalize=False, alpha=.5)
+                plotter.plot_indicators('contributions'+method+'_'+str(nref), domain, geom, {'internal':inter,'interfaces':iface,'boundaries':bound,'unweighted_internal':incom+force,'unweighted_interfaces':jump,'unweighted_boundaries':inflow+outflow}, normalize=False, alpha=.5)
 
-                domain, refined = refiner.refine(domain, indicators, num, evalbasis, maxlevel=maxreflevel+uref, select_type='same_level')
+                domain, refined = refiner.refine(domain, indicators, num, evalbasis, maxlevel=maxreflevel+uref+1, select_type='same_level')
 
             if method == 'residualbased':
 
@@ -199,7 +199,7 @@ def main(degree      = 3,
 
                 plotter.plot_indicators('indicators_'+method+'_'+str(nref), domain, geom, {'indicator':indicators,'internal':inter,'interfaces':iface,'boundaries':bound}, normalize=False, alpha=.5)
                 
-                domain, refined = refiner.refine(domain, indicators, num, evalbasis, maxlevel=maxreflevel+uref, select_type='same_level')
+                domain, refined = refiner.refine(domain, indicators, num, evalbasis, maxlevel=maxreflevel+uref+1, select_type='same_level')
 
             if method == 'uniform':
 
@@ -214,12 +214,10 @@ def main(degree      = 3,
                 break
 
         plotter.plot_mesh('mesh',domain,geom)
-        plotter.plot_streamlines('velocity',domain,geom,ns,ns.u)
-        plotter.plot_solution('pressure',domain,geom,ns.p)
     
-      plotter.plot_convergence('Estimated_error_force_'+str(M1),ndofs,error_force,labels=['dofs','Estimated error'],slopemarker=True)
-      plotter.plot_convergence('Estimated_error_incomp_'+str(M1),ndofs,error_incomp,labels=['dofs','Estimated error'],slopemarker=True)
-      plotter.plot_convergence('Dofs_vs_elems',nelems,ndofs,labels=['nelems','ndofs'])
+        plotter.plot_convergence('Estimated_error_force_'+str(M1),ndofs,error_force,labels=['dofs','Estimated error'],slopemarker=True)
+        plotter.plot_convergence('Estimated_error_incomp_'+str(M1),ndofs,error_incomp,labels=['dofs','Estimated error'],slopemarker=True)
+        plotter.plot_convergence('Dofs_vs_elems',nelems,ndofs,labels=['nelems','ndofs'])
 
     anouncer.drum()
 

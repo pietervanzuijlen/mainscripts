@@ -7,8 +7,7 @@ import numpy as np
 from utilities import *
 
 def main(degree      = 2,
-         refinements = 6,
-         npoints     = 5,
+         refinements = 15,
          num         = 0.2,
          uref        = 2,
          maxreflevel = 7,
@@ -18,6 +17,7 @@ def main(degree      = 2,
     methods = ['goaloriented']
 
     nelems    = {} 
+    elemsize  = {}
     ndofs     = {} 
     error_sol = {} 
     error_qoi = {} 
@@ -25,13 +25,13 @@ def main(degree      = 2,
     for method in methods:
 
         nelems[method]    = []
+        elemsize[method]  = []
         ndofs[method]     = []
         error_sol[method] = []
         error_qoi[method] = []
         
-        domain, geom = domainmaker.lshape_mpatch(uref=3, width=2, height=2)
+        domain, geom = domainmaker.lshape(uref=3, width=2, height=2)
 
-        #domain, geom = domainmaker.lshape_trim(uref=3, width=2, height=2)
         ns = function.Namespace()
         ns.x = geom
         ns.eps = np.mean(domain.integrate_elementwise(function.J(geom), degree=degree))/4
@@ -46,7 +46,7 @@ def main(degree      = 2,
             
             ### Primal problem ###
             ns.basis = domain.basis('th-spline', degree=degree, patchcontinuous=True, continuity=degree-1)
-            #ns.basis = domain.basis('th-spline', degree=degree, continuity=degree-1)
+
             x, y = geom
             th = function.ArcTan2(y,x) 
             R  = (x**2 + y**2)**.5
@@ -77,8 +77,8 @@ def main(degree      = 2,
     
             ### Dual problem ###
             dualdegree = degree + 1
+
             ns.dualbasis = domain.basis('th-spline', degree=dualdegree, patchcontinuous=True, continuity=degree)
-            #ns.dualbasis = domain.basis('th-spline', degree=dualdegree, continuity=degree)
     
             ns.z = 'dualbasis_n ?duallhs_n'
         
@@ -100,24 +100,6 @@ def main(degree      = 2,
         
             ns.Iz   = domain.projection(ns.z, ns.basis, geometry=geom, degree=dualdegree*2, constrain=cons)
             ### Dual problem ###
-    
-            
-            ### Get errors ###
-            
-            nelems[method]    += [len(domain)]
-            ndofs[method]     += [len(ns.basis)]
-            error_sol[method] += [np.sqrt(domain.integrate('(u - uh)^2 d:x' @ns, degree=degree*2))]
-            error_qoi[method] += [np.sqrt(domain.boundary['bottom'].boundary['right'].integrate('(u - uh)^2 d:x' @ ns , ischeme='gauss1'))]
-            ### Get errors ###
-
-
-            #Rz  = domain.boundary['left'].integrate('g1  z d:x' @ns, degree=degree*2) + domain.boundary['top'].integrate('g2  z d:x' @ns, degree=degree*2) + domain.boundary['right'].integrate('g3  z d:x' @ns, degree=degree*2) + domain.boundary['bottom'].integrate('g4  z d:x' @ns, degree=degree*2) - domain.integrate('uh_,i z_,i d:x' @ns, degree=degree*2)
-            #RIz = domain.boundary['left'].integrate('g1 Iz d:x' @ns, degree=degree*2) + domain.boundary['top'].integrate('g2 Iz d:x' @ns, degree=degree*2) + domain.boundary['right'].integrate('g3 Iz d:x' @ns, degree=degree*2) + domain.boundary['bottom'].integrate('g4 Iz d:x' @ns, degree=degree*2) - domain.integrate('uh_,i Iz_,i d:x' @ns, degree=degree*2)
-            #Rz_Iz = domain.boundary['left'].integrate('g1 (z - Iz) d:x' @ns, degree=degree*2) + domain.boundary['top'].integrate('g2 (z - Iz) d:x' @ns, degree=degree*2) + domain.boundary['right'].integrate('g3 (z - Iz) d:x' @ns, degree=degree*2) + domain.boundary['bottom'].integrate('g4 (z - Iz) d:x' @ns, degree=degree*2) - domain.integrate('uh_,i (z - Iz)_,i d:x' @ns, degree=degree*2)
-    
-            #print('R(z)    :', Rz)
-            #print('R(Iz)   :', RIz)
-            #print('R(z-Iz) :', Rz_Iz)
 
             ### Get indicaters ###
             ns.rint    = '(uh_,ii)^2'
@@ -146,8 +128,15 @@ def main(degree      = 2,
 
             rz = rz_int + rz_jump + rz_bound1 + rz_bound2 + rz_bound3 + rz_bound4
             ### Get indicaters ###
-    
-    
+
+            ### Get errors ###
+            nelems[method]    += [len(domain)]
+            elemsize[method]  += [1/min(h)]
+            ndofs[method]     += [len(ns.basis)]
+            error_sol[method] += [np.sqrt(domain.integrate('(u - uh)^2 d:x' @ns, degree=10))]
+            error_qoi[method] += [np.sqrt(domain.boundary['bottom'].boundary['right'].integrate('(u - uh)^2 d:x' @ ns , ischeme='gauss1'))]
+            ### Get errors ###
+
             ### Refine mesh ###
             if method == 'goaloriented':
 
@@ -158,11 +147,8 @@ def main(degree      = 2,
 
                 indicators =  inter + jump + bound 
 
-                #plotter.plot_indicators('residual_contributions_'+str(nref), domain, geom, {'internal':rint,'interfaces':rjump,'boundary':rbound1+rbound2+rbound3+rbound4})
-                #plotter.plot_indicators('sharp_contributions_'+str(nref), domain, geom, {'internal':rz_int,'interfaces':rz_jump,'boundary':rz_bound1+rz_bound2+rz_bound3+rz_bound4})
                 plotter.plot_indicators('indicators_'+method+'_'+str(nref), domain, geom, {'indicator':indicators,'internal':inter,'interfaces':jump,'boundary':bound}, alpha=.5)
-
-                domain, refined = refiner.refine(domain, indicators, num, ns.basis, maxlevel=maxreflevel, marker_type=None, select_type=None)
+                domain, refined = refiner.refine(domain, indicators, num, ns.basis, maxlevel=maxreflevel+uref+1, marker_type=None, select_type=None)
 
             if method == 'residualbased':
 
@@ -174,7 +160,7 @@ def main(degree      = 2,
                 indicators =  inter + jump + bound 
 
                 plotter.plot_indicators('indicators_'+method+'_'+str(nref), domain, geom, {'indicator':indicators,'internal':inter,'interfaces':jump,'boundary':bound}, alpha=.5)
-                domain, refined = refiner.refine(domain, indicators, num, ns.basis, maxlevel=maxreflevel, marker_type=None, select_type=None)
+                domain, refined = refiner.refine(domain, indicators, num, ns.basis, maxlevel=maxreflevel+uref+1, marker_type=None, select_type=None)
 
             if method == 'uniform':
 
@@ -187,6 +173,8 @@ def main(degree      = 2,
             if not refined:
                 break
             ### Refine mesh ###
+
+        ### Postprocessing ###
         plotter.plot_mesh(method+'mesh', domain, geom)
         plotter.plot_solution(method+'dualsolution', domain, geom, ns.z)
         plotter.plot_solution(method+'solution', domain, geom, ns.u)
@@ -194,10 +182,11 @@ def main(degree      = 2,
         writer.write('../results/laplace/'+method+'mollification', {'degree':degree, 'uref':uref, 'maxuref':maxuref, 'refinements':refinements, 'num':num},
                      ndofs=ndofs, nelems=nelems, error_sol=error_sol, error_qoi=error_qoi)
 
-    print(error_sol)
     plotter.plot_convergence('Exact_error',ndofs,error_sol,labels=['dofs','Exact error'],slopemarker=True)
+    plotter.plot_convergence('Exact_error_elemsize',elemsize,error_sol,labels=['1/h','Exact error'])
     plotter.plot_convergence('Error_in_QoI',ndofs,error_qoi,labels=['dofs','Error in QoI'],slopemarker=True)
     plotter.plot_convergence('Dofs_vs_elems',nelems,ndofs,labels=['nelems','ndofs'])
+        ### Postprocessing ###
 
     #anouncer.drum()
 
