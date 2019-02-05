@@ -7,14 +7,15 @@ import numpy as np
 from utilities import *
 
 def main(degree      = 2,
-         refinements = 3,
+         refinements = 6,
          npoints     = 5,
          num         = 0.2,
          uref        = 2,
          maxreflevel = 7,
          maxuref     = 3):
 
-    methods = ['goaloriented','uniform','residualbased']
+    methods = ['goaloriented','residualbased','uniform']
+    methods = ['goaloriented']
 
     nelems    = {} 
     ndofs     = {} 
@@ -60,7 +61,6 @@ def main(degree      = 2,
             ns.u  = R**(2/3) * function.Sin(2/3*th+np.pi/3) 
     
             ns.uh = 'basis_n ?lhs_n'
-            ns.e  = 'u - uh'
         
             A    = domain.integrate(ns.eval_ij('basis_i,k basis_j,k d:x'), degree=degree*2)
             b    = domain.boundary['left'].integrate(ns.eval_i('basis_i g1 d:x'), degree=degree*2)
@@ -85,9 +85,12 @@ def main(degree      = 2,
             B = domain.integrate(ns.eval_ij('dualbasis_i,k dualbasis_j,k d:x'), degree=dualdegree*2)
 
 
+            # single patch
             #Q = domain.boundary['bottom'].boundary['top'].integrate(ns.eval_i('dualbasis_i d:x'), degree=dualdegree*2)
-            #Q = domain.boundary['bottom'].boundary['right'].integrate(ns.eval_i('dualbasis_i d:x'), degree=dualdegree*2)
-            Q = domain.integrate(ns.eval_i('k2 dualbasis_i d:x'), degree=dualdegree*2)
+            # multi patch
+            Q = domain.boundary['bottom'].boundary['right'].integrate(ns.eval_i('dualbasis_i d:x'), degree=dualdegree*2)
+            # mollification
+            #Q = domain.integrate(ns.eval_i('k2 dualbasis_i d:x'), degree=dualdegree*2)
 
     
             consdual = domain.boundary['inner'].project(0, onto=ns.dualbasis, geometry=geom, degree=dualdegree*2)
@@ -159,7 +162,7 @@ def main(degree      = 2,
                 #plotter.plot_indicators('sharp_contributions_'+str(nref), domain, geom, {'internal':rz_int,'interfaces':rz_jump,'boundary':rz_bound1+rz_bound2+rz_bound3+rz_bound4})
                 plotter.plot_indicators('indicators_'+method+'_'+str(nref), domain, geom, {'indicator':indicators,'internal':inter,'interfaces':jump,'boundary':bound}, alpha=.5)
 
-                domain, refined = refiner.refine(domain, indicators, num, ns.basis, maxlevel=maxreflevel, marker_type=None, select_type='same_level')
+                domain, refined = refiner.refine(domain, indicators, num, ns.basis, maxlevel=maxreflevel, marker_type=None, select_type=None)
 
             if method == 'residualbased':
 
@@ -170,8 +173,8 @@ def main(degree      = 2,
 
                 indicators =  inter + jump + bound 
 
-                plotter.plot_indicators('indicators_'+method+'_'+str(nref), domain, geom, {'indicator':indicators}, alpha=.5)
-                domain, refined = refiner.refine(domain, indicators, num, ns.basis, maxlevel=maxreflevel, marker_type=None, select_type='same_level')
+                plotter.plot_indicators('indicators_'+method+'_'+str(nref), domain, geom, {'indicator':indicators,'internal':inter,'interfaces':jump,'boundary':bound}, alpha=.5)
+                domain, refined = refiner.refine(domain, indicators, num, ns.basis, maxlevel=maxreflevel, marker_type=None, select_type=None)
 
             if method == 'uniform':
 
@@ -185,10 +188,13 @@ def main(degree      = 2,
                 break
             ### Refine mesh ###
         plotter.plot_mesh(method+'mesh', domain, geom)
+        plotter.plot_solution(method+'dualsolution', domain, geom, ns.z)
+        plotter.plot_solution(method+'solution', domain, geom, ns.u)
     
         writer.write('../results/laplace/'+method+'mollification', {'degree':degree, 'uref':uref, 'maxuref':maxuref, 'refinements':refinements, 'num':num},
                      ndofs=ndofs, nelems=nelems, error_sol=error_sol, error_qoi=error_qoi)
 
+    print(error_sol)
     plotter.plot_convergence('Exact_error',ndofs,error_sol,labels=['dofs','Exact error'],slopemarker=True)
     plotter.plot_convergence('Error_in_QoI',ndofs,error_qoi,labels=['dofs','Error in QoI'],slopemarker=True)
     plotter.plot_convergence('Dofs_vs_elems',nelems,ndofs,labels=['nelems','ndofs'])

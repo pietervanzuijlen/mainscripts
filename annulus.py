@@ -113,7 +113,7 @@ def main(degree      = 3,
             ns.l   = 'Lbasis_n ?dualtest_n'
     
             # Goal quantity: pressure
-            ns.Q = '(1 + tanh( 100 (x_0 - x_1))) / 2'
+            ns.Q = '(1 + tanh( 100 (x_0 - 2 x_1))) / 2'
     
             # nitsche term
             ns.nitsche  = 'mu ( (z_i,j + z_j,i) n_i) v_j + mu ( (v_i,j + v_j,i) n_i ) z_j - mu (beta / he) v_i z_i - s v_i n_i - q z_i n_i'
@@ -180,7 +180,7 @@ def main(degree      = 3,
         #### Post-processing ###
         plotter.plot_mesh('mesh', domain, geom)
 
-        writer.write('../results/annulus/halfpressure', {'degree':degree, 'uref':uref, 'maxuref':maxuref, 'refinements':refinements, 'num':num, 'beta':beta},
+        writer.write('../results/annulus/quarterpressure', {'degree':degree, 'uref':uref, 'maxuref':maxuref, 'refinements':refinements, 'num':num, 'beta':beta},
                      ndofs=ndofs, nelems=nelems, err_u=err_u, err_p=err_p, err_Q=err_Q)
 
     plotter.plot_convergence('Exact_error_velocity',ndofs,err_u,labels=['dofs','Exact velocity error'])

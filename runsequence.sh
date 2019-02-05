@@ -1,3 +1,4 @@
-python3 stokes.py M1=.5
-python3 stokes.py M1=.4
-python3 stokes.py M1=.35
+python3 laplace.py degree=1
+python3 laplace.py degree=2
+python3 laplace.py degree=3
+python3 laplace.py degree=4
