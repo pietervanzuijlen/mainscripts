@@ -1,20 +1,18 @@
 from   nutils import *
 import numpy as np
 from utilities import *
-
 import matplotlib.pyplot as plt
 from matplotlib import collections
 
-def main(degree     = 2,        # polynomial degree of pressure and velocity field
+def main(degree     = 3,        # polynomial degree of pressure and velocity field
          uref       = 1,        # amount of uniform refinements before solving the problem
-         refinements= 3,        # amount of refinement steps
+         refinements= 10,       # amount of refinement steps
          num        = 0.5,      # quantity indicating the amount of refinement each step
          nelem      = 4,        # amount of elements in the initial grid
-         maxreflevel= 4,        # maximum level of refinements
-         maxrefine  = 3,        # refinement level for the trimming operation
-         beta       = 20,       # nitsche control parameter
-         gamma      = 0.00005,  # skeleton control parameter
-         alpha      = 0.000005, # ghost control parameter
+         maxrefine  = 4,        # refinement level for the trimming operation and adaptivity
+         maxuref    = 3,        # maximum amount of uniform refinements
+         beta       = 15.,      # nitsche control parameter
+         gamma      = .001,     # skeleton control parameter
          ):
 
     methods = ['goaloriented','residualbased','uniform']
@@ -43,8 +41,6 @@ def main(degree     = 2,        # polynomial degree of pressure and velocity fie
     domain = domain.trim(function.norm2((x0,x1-1))-rc,     maxrefine=maxrefine)
     domain = domain.trim(function.norm2((x0-M0,x1-M1))-rm, maxrefine=maxrefine)
 
-    skeleton, ghost = domainmaker.skelghost(grid, domain)
-
     for method in methods:
 
       nelems[method] = []
@@ -55,28 +51,21 @@ def main(degree     = 2,        # polynomial degree of pressure and velocity fie
       for nref in range(refinements):
 
         # Defining the background and skeleton 
+        skeleton, ghost = domainmaker.skelghost(grid, domain)
 
         ns = function.Namespace()
 
         # Defining element sizes
         areas = domain.integrate_elementwise(function.J(geom), degree=degree)
-        gridareas = grid.integrate_elementwise(function.J(geom), degree=degree)
+        ifacelen = skeleton.integrate_elementwise(function.J(geom), degree=degree)
 
-        hK = np.sqrt(np.mean(gridareas))
-        hF = [] 
-
-        for trans in domain.transforms:
-            head, tail = domain.transforms.index_with_tail(trans)
-            hF.append(hK*0.5**(len(tail)-2-uref))
-
-        ns.he = function.elemwise(domain.transforms, areas)
-        ns.hF = function.elemwise(domain.transforms, hF)
+        ns.he = function.elemwise(domain.transforms, np.sqrt(areas))
+        ns.hF = function.elemwise(skeleton.transforms, ifacelen)
 
         # Problem parameters
         ns.mu     = 1 
         ns.beta   = beta
-        ns.gskel  = gamma 
-        ns.gghost = alpha
+        ns.gamma  = gamma / (degree * 2)
         ns.x      = geom
    
         ######################
@@ -118,8 +107,8 @@ def main(degree     = 2,        # polynomial degree of pressure and velocity fie
             jumpq = norm_derivative.format(val=jumpq, i=i)
             jumpv = norm_derivative.format(val=jumpv, i=i)
         
-        ns.skeleton = 'gskel mu^-1 hF^{} [[{}]] [[{}]]'.format(2*degree+1, jumpp, jumpq)
-        ns.ghost    = 'gghost  mu hF^{} [[{}]] [[{}]]'.format(2*degree-1, jumpu, jumpv)
+        ns.skeleton = '0.1 gamma mu^-1 hF^{} [[{}]] [[{}]]'.format(2*degree+1, jumpp, jumpq)
+        ns.ghost    = 'gamma mu hF^{} [[{}]] [[{}]]'.format(2*degree-1, jumpu, jumpv)
 
         # nitsche term
         ns.nitsche  = 'mu ( (u_i,j + u_j,i) n_i) v_j + mu ( (v_i,j + v_j,i) n_i ) u_j - mu (beta / he) v_i u_i - p v_i n_i - q u_i n_i'
@@ -169,8 +158,9 @@ def main(degree     = 2,        # polynomial degree of pressure and velocity fie
             jumpq = norm_derivative.format(val=jumpq, i=i)
             jumpv = norm_derivative.format(val=jumpv, i=i)
         
-        ns.skeleton = 'gskel mu^-1 hF^{} [[{}]] [[{}]]'.format(2*dualdegree+1, jumpq, jumps)
-        ns.ghost    = 'gghost  mu hF^{} [[{}]] [[{}]]'.format(2*dualdegree-1, jumpv, jumpz)
+        ns.gamma  = gamma / (dualdegree * 2)
+        ns.skeleton = 'gamma mu^-1 hF^{} [[{}]] [[{}]]'.format(2*dualdegree+1, jumpq, jumps)
+        ns.ghost    = 'gamma  mu hF^{} [[{}]] [[{}]]'.format(2*dualdegree-1, jumpv, jumpz)
     
         # nitsche term
         ns.nitsche  = 'mu ( (z_i,j + z_j,i) n_i) v_j + mu ( (v_i,j + v_j,i) n_i ) z_j - mu (beta / he) v_i z_i - s v_i n_i - q z_i n_i'
@@ -202,10 +192,10 @@ def main(degree     = 2,        # polynomial degree of pressure and velocity fie
         ######################
 
         # Define values
-        ns.inflow  = '(g_i - (u_j,i + u_i,j) n_j + p n_i) (g_i - (u_l,i + u_i,l) n_l + p n_i)'
-        ns.outflow = '(-(u_j,i + u_i,j) n_j + p n_i) (-(u_l,i + u_i,l) n_l + p n_i)'
-        ns.jump    = '([-(u_j,i + u_i,j)] n_j + [p] n_i) ([-(u_l,i + u_i,l)] n_l + [p] n_i)'
-        ns.force   = '((u_j,i + u_i,j)_,j - p_,i) ((u_l,i + u_i,l)_,l - p_,i)'
+        ns.inflow  = '(g_i - stress_ij n_j) (g_i - stress_il n_l)'
+        ns.outflow  = '(- stress_ij n_j) (- stress_il n_l)'
+        ns.jump    = '[stress_ij] n_j [stress_il] n_l'
+        ns.force   = 'stress_ij,j stress_il,l'
         ns.zsharp  = '(z_i - Iz_i) (z_i - Iz_i)'
 
         ns.incom   = '(u_i,i)^2'
@@ -236,12 +226,11 @@ def main(degree     = 2,        # polynomial degree of pressure and velocity fie
             indicators =  inter + iface + bound 
     
             # Plot indicators
-            plotter.plot_indicators('residual_contributions_'+str(nref), domain, geom, {'force':force,'incompressibility':incom,'interfaces':jump,'boundaries':inflow+outflow}, normalize=False)
-            plotter.plot_indicators('sharp_contributions_'+str(nref), domain, geom, {'z_internal':z_int,'s_internal':s_int,'z_interfaces':z_jump,'z_boundaries':z_inflow+z_outflow}, normalize=False)
-            plotter.plot_indicators('indicators_'+'_'+str(nref), domain, geom, {'indicator':indicators,'internal':inter,'interfaces':iface,'boundaries':bound}, normalize=False)
+            #plotter.plot_indicators('residual_contributions_'+str(nref), domain, geom, {'force':force,'incompressibility':incom,'interfaces':jump,'boundaries':inflow+outflow}, normalize=False)
+            #plotter.plot_indicators('sharp_contributions_'+str(nref), domain, geom, {'z_internal':z_int,'s_internal':s_int,'z_interfaces':z_jump,'z_boundaries':z_inflow+z_outflow}, normalize=False)
+            #plotter.plot_indicators('indicators_'+'_'+str(nref), domain, geom, {'indicator':indicators,'internal':inter,'interfaces':iface,'boundaries':bound}, normalize=False)
     
             domain, grid, refined = refiner.refine(domain, indicators, num, evalbasis, maxlevel=maxreflevel+uref, grid=grid, marker_type=None, select_type=None)
-            print('Find a way to refine grid as well')
 
         if method == 'residualbased':
 
@@ -271,14 +260,25 @@ def main(degree     = 2,        # polynomial degree of pressure and velocity fie
             break
 
         #plotter.plot_levels(method+'mesh_'+str(nref), domain, geom, minlvl=uref)
+
+        ns.momentum_i = 'mu (u_i,j + u_j,i)_,j + p_,i'
+        #plotter.plot_streamlines('momentum',domain,geom,ns,ns.momentum)
+        plotter.plot_streamlines('dualvelocity_'+str(nref), domain, geom, ns, ns.z)
+        plotter.plot_solution('dualpressure'+str(nref), domain, geom, ns.s, alpha=0.3)
         plotter.plot_streamlines('velocity_'+str(nref), domain, geom, ns, ns.u)
-        plotter.plot_solution('pressure'+str(nref), domain, geom, ns.p)
+        plotter.plot_solution('pressure'+str(nref), domain, geom, ns.p, alpha=0.3)
+        plotter.plot_trim('mesh'+str(nref), domain, grid, geom)
+
+        #plotter.plot_mesh('mesh'+str(nref),domain, geom)
 
     # Plot convergence
     plotter.plot_convergence('Estimated_error_force',ndofs,error_force,labels=['dofs','Estimated error'], slopemarker=True)
     plotter.plot_convergence('Estimated_error_incomp',ndofs,error_incomp,labels=['dofs','Estimated error'], slopemarker=True)
 
-    anouncer.drum()
+    #anouncer.drum()
 
 with config(verbose=3,nprocs=6):
     cli.run(main)
+
+
+

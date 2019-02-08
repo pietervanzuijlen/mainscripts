@@ -13,15 +13,17 @@ def main(degree      = 3,
 
     methods = ['goaloriented','residualbased','uniform']
 
-    nelems    = {} 
-    ndofs     = {} 
-    error_force = {} 
-    error_incomp = {} 
-    error_qoi = {} 
-    error_zincomp = {} 
 
-    for method in methods:
-      for M1 in [.5,.4,.35]:
+    for M1, r1, r2, in zip([.5,.45,.4,.35],[.2,.24,.28,.32],[.2,.24,.28,.32]):
+
+      nelems    = {} 
+      ndofs     = {} 
+      error_force = {} 
+      error_incomp = {} 
+      error_qoi = {} 
+      error_zincomp = {} 
+
+      for method in methods:
 
         nelems[method]       = []
         ndofs[method]        = []
@@ -30,7 +32,7 @@ def main(degree      = 3,
         error_qoi[method] = []
         error_zincomp[method] = []
         
-        domain, geom = domainmaker.porous(uref=uref, M1=M1)
+        domain, geom = domainmaker.porous(uref=uref, M1=M1, r1=r1, r2=r2)
         ns = function.Namespace()
 
         ns.mu = 1
@@ -65,7 +67,7 @@ def main(degree      = 3,
             # Nitsche values
             ns.beta = beta 
             areas = domain.integrate_elementwise(function.J(geom), degree=degree)
-            ns.he = function.elemwise(domain.transforms, areas)
+            ns.he = function.elemwise(domain.transforms, np.sqrt(areas))
             ns.nitsche  = 'mu ( (u_i,j + u_j,i) n_i) v_j + mu ( (v_i,j + v_j,i) n_i ) u_j - mu (beta / he) v_i u_i - p v_i n_i - q u_i n_i'
     
             res = domain.boundary['left'].integral('(g_i v_i) d:x' @ ns, degree=degree*2)
@@ -94,7 +96,6 @@ def main(degree      = 3,
             ns.q = 'dualpbasis_n ?dualtest_n'
    
             # Nitsche values
-            ns.beta = 5
             ns.nitsche  = 'mu ( (z_i,j + z_j,i) n_i) v_j + mu ( (v_i,j + v_j,i) n_i ) z_j - mu (beta / he) v_i z_i - s v_i n_i - q z_i n_i'
     
             res = domain.boundary['right'].integral('n_i v_i d:x' @ ns, degree=dualdegree*2)
@@ -111,8 +112,8 @@ def main(degree      = 3,
     
             
             ### Get errors ###
-            nelems[method]    += [len(domain)]
-            ndofs[method]     += [len(ns.ubasis)]
+            nelems[method]       += [len(domain)]
+            ndofs[method]        += [len(ns.ubasis)]
             error_force[method]  += [domain.integrate(function.norm2('stress_ij,i d:x' @ns), ischeme='gauss5')]
             error_incomp[method] += [domain.integrate(function.abs('u_i,i d:x' @ns), ischeme='gauss5')]
 
@@ -183,8 +184,8 @@ def main(degree      = 3,
 
                 indicators =  inter + iface + bound 
 
-                plotter.plot_indicators('indicators_'+method+'_'+str(nref), domain, geom, {'indicator':indicators,'unweighted_indicators':incom+force+jump+inflow}, normalize=False, alpha=.5)
-                plotter.plot_indicators('contributions'+method+'_'+str(nref), domain, geom, {'internal':inter,'interfaces':iface,'boundaries':bound,'unweighted_internal':incom+force,'unweighted_interfaces':jump,'unweighted_boundaries':inflow+outflow}, normalize=False, alpha=.5)
+                plotter.plot_indicators('indicators_'+method+'_'+str(nref), domain, geom, {'indicator':indicators,'unweighted_indicators':incom+force+jump+inflow,'weights':z_int+s_int+z_jump+z_inflow+z_outflow}, normalize=False, alpha=.5)
+                #plotter.plot_indicators('contributions'+method+'_'+str(nref), domain, geom, {'internal':inter,'interfaces':iface,'boundaries':bound,'unweighted_internal':incom+force,'unweighted_interfaces':jump,'unweighted_boundaries':inflow+outflow}, normalize=False, alpha=.5)
 
                 domain, refined = refiner.refine(domain, indicators, num, evalbasis, maxlevel=maxreflevel+uref+1, select_type='same_level')
 
@@ -214,12 +215,16 @@ def main(degree      = 3,
                 break
 
         plotter.plot_mesh('mesh',domain,geom)
+        plotter.plot_solution('pressure',domain,geom,ns.p)
+        plotter.plot_solution('dualpressure',domain,geom,ns.s)
+        plotter.plot_streamlines('velocity',domain,geom,ns,ns.u)
+        plotter.plot_streamlines('dualvelocity',domain,geom,ns,ns.z)
     
-        plotter.plot_convergence('Estimated_error_force_'+str(M1),ndofs,error_force,labels=['dofs','Estimated error'],slopemarker=True)
-        plotter.plot_convergence('Estimated_error_incomp_'+str(M1),ndofs,error_incomp,labels=['dofs','Estimated error'],slopemarker=True)
-        plotter.plot_convergence('Dofs_vs_elems',nelems,ndofs,labels=['nelems','ndofs'])
+      plotter.plot_convergence('Estimated_error_force_'+str(M1),ndofs,error_force,labels=['dofs','Estimated error'],slopemarker=True)
+      plotter.plot_convergence('Estimated_error_incomp_'+str(M1),ndofs,error_incomp,labels=['dofs','Estimated error'],slopemarker=True)
+      plotter.plot_convergence('Dofs_vs_elems'+str(M1),nelems,ndofs,labels=['nelems','ndofs'])
 
-    anouncer.drum()
+    #anouncer.drum()
 
 with config(verbose=3,nprocs=6):
     cli.run(main)
