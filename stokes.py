@@ -114,7 +114,7 @@ def main(degree      = 3,
             ndofs[method]        += [len(ns.ubasis)]
             error_force[method]  += [domain.integrate(function.norm2('stress_ij,i d:x' @ns), ischeme='gauss5')]
             error_incomp[method] += [domain.integrate(function.abs('u_i,i d:x' @ns), ischeme='gauss5')]
-            error_qoi[method]    += [domain.boundary['left'].integrate('g_i z_i d:x' @ ns, ischeme='gauss5')-domain.boundary['right'].integrate('n_i u_i d:x' @ ns, ischeme='gauss5')]
+            error_qoi[method]    += [abs(domain.boundary['left'].integrate('g_i z_i d:x' @ ns, ischeme='gauss5')-domain.boundary['right'].integrate('n_i u_i d:x' @ ns, ischeme='gauss5'))]
             ### Get errors ###
     
     

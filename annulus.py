@@ -24,6 +24,7 @@ def main(degree      = 3,
     err_u = {} 
     err_p = {} 
     err_Q = {} 
+    est_Q = {} 
 
     for method in methods:
 
@@ -32,6 +33,7 @@ def main(degree      = 3,
         err_u[method]  = []
         err_p[method]  = []
         err_Q[method]  = []
+        est_Q[method]  = []
   
         domain, geom = domainmaker.annulus(uref=uref)
   
@@ -90,8 +92,7 @@ def main(degree      = 3,
             
             trail = solver.solve_linear('trail', res.derivative('test'))
             ns = ns(trail=trail)
-        
-            
+
             ####################
             ### Dual problem ###
             ####################
@@ -113,12 +114,12 @@ def main(degree      = 3,
             ns.l   = 'Lbasis_n ?dualtest_n'
     
             # Goal quantity: pressure
-            ns.Q = '(1 + tanh( 100 (x_0 - 2 x_1))) / 2'
+            ns.h = '(1 + tanh( 100 (x_0 - 2 x_1))) / 2'
     
             # nitsche term
             ns.nitsche  = 'mu ( (z_i,j + z_j,i) n_i) v_j + mu ( (v_i,j + v_j,i) n_i ) z_j - mu (beta / he) v_i z_i - s v_i n_i - q z_i n_i'
         
-            res = domain.integral('Q q d:x' @ ns, degree=dualdegree*2)
+            res = domain.integral('h q d:x' @ ns, degree=dualdegree*2)
             res += domain.integral('(- mu (z_j,i + z_i,j) v_j,i + s v_k,k + q z_l,l ) d:x' @ ns, degree=dualdegree*2)
             res += domain.integral('(- l s - lh q ) d:x' @ ns, degree=dualdegree*2)
             res += domain.boundary.integral('nitsche d:x' @ns, degree=degree*2)
@@ -138,7 +139,8 @@ def main(degree      = 3,
             ndofs[method]  += [len(evalbasis)]
             err_u[method]  += [domain.integrate(function.norm2('(uexact_i - uh_i) d:x' @ns), degree=degree*2)]
             err_p[method]  += [np.sqrt(domain.integrate('(pexact - ph)^2 d:x' @ns, degree=degree*2))]
-            err_Q[method]  += [np.sqrt(domain.integrate('Q (pexact - ph)^2 d:x' @ns, degree=degree*2))]
+            err_Q[method]  += [np.sqrt(domain.integrate('h (pexact - ph)^2 d:x' @ns, degree=degree*2))]
+            est_Q[method]  += [abs(domain.integrate('f_i z_i d:x' @ns, degree=degree*2) - domain.integrate('h ph^2 d:x' @ns, degree=degree*2))]
     
             # indicators
             ns.moment = '(f_i + (uh_j,i + uh_i,j)_,j - ph_,i) (f_i + (uh_l,i + uh_i,l)_,l - ph_,i)'
@@ -181,11 +183,12 @@ def main(degree      = 3,
         plotter.plot_mesh('mesh', domain, geom)
 
         writer.write('../results/annulus/quarterpressure', {'degree':degree, 'uref':uref, 'maxuref':maxuref, 'refinements':refinements, 'num':num, 'beta':beta},
-                     ndofs=ndofs, nelems=nelems, err_u=err_u, err_p=err_p, err_Q=err_Q)
+                     ndofs=ndofs, nelems=nelems, err_u=err_u, err_p=err_p, err_Q=err_Q, est_Q=est_Q)
 
     plotter.plot_convergence('Exact_error_velocity',ndofs,err_u,labels=['dofs','Exact velocity error'])
     plotter.plot_convergence('Exact_error_pressure',ndofs,err_p,labels=['dofs','Exact pressure error'])
     plotter.plot_convergence('Exact_error_quantity',ndofs,err_Q,labels=['dofs','Exact quantity error'])
+    plotter.plot_convergence('Estimate_error_quantity',ndofs,est_Q,labels=['dofs','Estimated quantity error'])
     plotter.plot_convergence('Dofs_vs_elems',nelems,ndofs,labels=['nelems','ndofs'])
     
     plotter.plot_solution('exact_pressure', domain, geom, ns.pexact)
