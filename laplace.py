@@ -7,20 +7,20 @@ import numpy as np
 from utilities import *
 
 def main(degree      = 2,
-         refinements = 15,
+         refinements = 5,
          num         = 0.2,
          uref        = 2,
          maxreflevel = 7,
          maxuref     = 3):
 
     methods = ['goaloriented','residualbased','uniform']
-    methods = ['goaloriented']
 
     nelems    = {} 
     elemsize  = {}
     ndofs     = {} 
     error_sol = {} 
     error_qoi = {} 
+    error_qoi_est = {} 
 
     for method in methods:
 
@@ -29,6 +29,7 @@ def main(degree      = 2,
         ndofs[method]     = []
         error_sol[method] = []
         error_qoi[method] = []
+        error_qoi_est[method] = []
         
         domain, geom = domainmaker.lshape(uref=3, width=2, height=2)
 
@@ -135,6 +136,7 @@ def main(degree      = 2,
             ndofs[method]     += [len(ns.basis)]
             error_sol[method] += [np.sqrt(domain.integrate('(u - uh)^2 d:x' @ns, degree=10))]
             error_qoi[method] += [np.sqrt(domain.boundary['bottom'].boundary['right'].integrate('(u - uh)^2 d:x' @ ns , ischeme='gauss1'))]
+            error_qoi_est[method] += [abs(domain.boundary['bottom'].boundary['right'].integrate('uh d:x' @ ns , ischeme='gauss5')-domain.boundary['left'].integrate('g1 z d:x' @ ns , ischeme='gauss5')-domain.boundary['top'].integrate('g2 z d:x' @ ns , ischeme='gauss5')-domain.boundary['right'].integrate('g3 z d:x' @ ns , ischeme='gauss5')-domain.boundary['bottom'].integrate('g4 z d:x' @ ns , ischeme='gauss5'))]
             ### Get errors ###
 
             ### Refine mesh ###
@@ -184,6 +186,7 @@ def main(degree      = 2,
 
     plotter.plot_convergence('Exact_error',ndofs,error_sol,labels=['dofs','Exact error'],slopemarker=True)
     plotter.plot_convergence('Exact_error_elemsize',elemsize,error_sol,labels=['1/h','Exact error'])
+    plotter.plot_convergence('Error_est_QoI',ndofs,error_qoi_est,labels=['dofs','Error estimate'])
     plotter.plot_convergence('Error_in_QoI',ndofs,error_qoi,labels=['dofs','Error in QoI'],slopemarker=True)
     plotter.plot_convergence('Dofs_vs_elems',nelems,ndofs,labels=['nelems','ndofs'])
         ### Postprocessing ###

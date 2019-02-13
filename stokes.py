@@ -4,7 +4,7 @@ import numpy as np
 
 def main(degree      = 3,
          uref        = 1,
-         refinements = 10,
+         refinements = 2,
          num         = 0.5,
          npoints     = 5,
          maxreflevel = 6,
@@ -14,14 +14,13 @@ def main(degree      = 3,
     methods = ['goaloriented','residualbased','uniform']
 
 
-    for M1, r1, r2, in zip([.5,.45,.4,.35],[.2,.24,.28,.32],[.2,.24,.28,.32]):
+    for M1 in [.5,.4,.35]:
 
-      nelems    = {} 
-      ndofs     = {} 
-      error_force = {} 
-      error_incomp = {} 
-      error_qoi = {} 
-      error_zincomp = {} 
+      nelems        = {} 
+      ndofs         = {} 
+      error_force   = {} 
+      error_incomp  = {} 
+      error_qoi     = {} 
 
       for method in methods:
 
@@ -29,10 +28,9 @@ def main(degree      = 3,
         ndofs[method]        = []
         error_force[method]  = []
         error_incomp[method] = []
-        error_qoi[method] = []
-        error_zincomp[method] = []
+        error_qoi[method]    = []
         
-        domain, geom = domainmaker.porous(uref=uref, M1=M1, r1=r1, r2=r2)
+        domain, geom = domainmaker.porous(uref=uref, M1=M1)
         ns = function.Namespace()
 
         ns.mu = 1
@@ -116,24 +114,7 @@ def main(degree      = 3,
             ndofs[method]        += [len(ns.ubasis)]
             error_force[method]  += [domain.integrate(function.norm2('stress_ij,i d:x' @ns), ischeme='gauss5')]
             error_incomp[method] += [domain.integrate(function.abs('u_i,i d:x' @ns), ischeme='gauss5')]
-
-            #Rz  = domain.boundary['left'].integrate('g_i  z_i d:x' @ns, ischeme='gauss5') - domain.integrate('(u_i,j  z_i,j - p  z_k,k) d:x' @ns, ischeme='gauss5')
-            #RIz = domain.boundary['left'].integrate('g_i Iz_i d:x' @ns, ischeme='gauss5') - domain.integrate('(u_i,j Iz_i,j - p Iz_k,k) d:x' @ns, ischeme='gauss5')
-            #Rz_Iz = domain.boundary['left'].integrate('g_i (z_i - Iz_i) d:x' @ns, ischeme='gauss5') - domain.integrate('((u_j,i + u_i,j)  (z_i,j - Iz_i,j) - p (z_k,k - Iz_k,k)) d:x' @ns, ischeme='gauss5')
-
-            #Rs = domain.integrate('(s u_i,i) d:x' @ns, ischeme='gauss5')
-            #RIs = domain.integrate('(Is u_i,i) d:x' @ns, ischeme='gauss5')
-
-            #error_qoi[method]    += [abs(Rz)]
-            #error_zincomp[method] += [abs(Rs)]
-
-            #ns.momentum_i = 'mu (u_i,j + u_j,i)_,j + p_,i'
-            #ns.force_i    = 'mu (u_i,j + u_j,i)_,j'
-            #ns.presgrad_i = 'p_,i'
-            #plotter.plot_streamlines('momentum',domain,geom,ns,ns.momentum)
-            #plotter.plot_streamlines('force',domain,geom,ns,ns.force)
-            #plotter.plot_streamlines('presgrad',domain,geom,ns,ns.presgrad)
-
+            error_qoi[method]    += [domain.boundary['left'].integrate('g_i z_i d:x' @ ns, ischeme='gauss5')-domain.boundary['right'].integrate('n_i u_i d:x' @ ns, ischeme='gauss5')]
             ### Get errors ###
     
     
@@ -214,15 +195,15 @@ def main(degree      = 3,
             if not refined:
                 break
 
-        plotter.plot_mesh('mesh',domain,geom)
-        plotter.plot_solution('pressure',domain,geom,ns.p)
-        plotter.plot_solution('dualpressure',domain,geom,ns.s)
-        plotter.plot_streamlines('velocity',domain,geom,ns,ns.u)
-        plotter.plot_streamlines('dualvelocity',domain,geom,ns,ns.z)
+        plotter.plot_mesh('mesh'+method+str(M1),domain,geom, title=method+str(M1))
+        plotter.plot_solution('pressure'+method+str(M1),domain,geom,ns.p)
+        plotter.plot_solution('dualpressure'+method+str(M1),domain,geom,ns.s)
+        plotter.plot_streamlines('velocity'+method+str(M1),domain,geom,ns,ns.u)
+        plotter.plot_streamlines('dualvelocity'+method+str(M1),domain,geom,ns,ns.z)
     
       plotter.plot_convergence('Estimated_error_force_'+str(M1),ndofs,error_force,labels=['dofs','Estimated error'],slopemarker=True)
       plotter.plot_convergence('Estimated_error_incomp_'+str(M1),ndofs,error_incomp,labels=['dofs','Estimated error'],slopemarker=True)
-      plotter.plot_convergence('Dofs_vs_elems'+str(M1),nelems,ndofs,labels=['nelems','ndofs'])
+      plotter.plot_convergence('Estimated_error_QoI'+str(M1),ndofs,error_qoi,labels=['dofs','Estimated error'])
 
     #anouncer.drum()
 

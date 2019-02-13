@@ -11,7 +11,7 @@ def main(degree     = 3,        # polynomial degree of pressure and velocity fie
          nelem      = 4,        # amount of elements in the initial grid
          maxrefine  = 4,        # refinement level for the trimming operation and adaptivity
          maxuref    = 3,        # maximum amount of uniform refinements
-         beta       = 15.,      # nitsche control parameter
+         beta       = 14.,      # nitsche control parameter
          gamma      = .001,     # skeleton control parameter
          ):
 
@@ -226,11 +226,12 @@ def main(degree     = 3,        # polynomial degree of pressure and velocity fie
             indicators =  inter + iface + bound 
     
             # Plot indicators
+            plotter.plot_indicators('indicators_'+method+'_'+str(nref), domain, geom, {'indicator':indicators,'unweighted_indicators':incom+force+jump+inflow,'weights':z_int+s_int+z_jump+z_inflow+z_outflow}, normalize=False, alpha=.5)
             #plotter.plot_indicators('residual_contributions_'+str(nref), domain, geom, {'force':force,'incompressibility':incom,'interfaces':jump,'boundaries':inflow+outflow}, normalize=False)
             #plotter.plot_indicators('sharp_contributions_'+str(nref), domain, geom, {'z_internal':z_int,'s_internal':s_int,'z_interfaces':z_jump,'z_boundaries':z_inflow+z_outflow}, normalize=False)
             #plotter.plot_indicators('indicators_'+'_'+str(nref), domain, geom, {'indicator':indicators,'internal':inter,'interfaces':iface,'boundaries':bound}, normalize=False)
     
-            domain, grid, refined = refiner.refine(domain, indicators, num, evalbasis, maxlevel=maxreflevel+uref, grid=grid, marker_type=None, select_type=None)
+            domain, grid, refined = refiner.refine(domain, indicators, num, evalbasis, maxlevel=maxrefine+uref, grid=grid, marker_type=None, select_type=None)
 
         if method == 'residualbased':
 
@@ -241,10 +242,11 @@ def main(degree     = 3,        # polynomial degree of pressure and velocity fie
 
             indicators =  inter + iface + bound 
 
-            plotter.plot_indicators('residual_contributions_'+str(nref), domain, geom, {'force':force*h,'incompressibility':incom*h,'interfaces':jump*np.sqrt(h),'boundaries':(inflow+outflow)*np.sqrt(h)}, normalize=False)
-            plotter.plot_indicators('indicators_'+method+'_'+str(nref), domain, geom, {'indicator':indicators})
+            plotter.plot_indicators('indicators_'+method+'_'+str(nref), domain, geom, {'indicator':indicators,'internal':inter,'interfaces':iface,'boundaries':bound}, normalize=False, alpha=.5)
+            #plotter.plot_indicators('residual_contributions_'+str(nref), domain, geom, {'force':force*h,'incompressibility':incom*h,'interfaces':jump*np.sqrt(h),'boundaries':(inflow+outflow)*np.sqrt(h)}, normalize=False)
+            #plotter.plot_indicators('indicators_'+method+'_'+str(nref), domain, geom, {'indicator':indicators})
             
-            domain, grid, refined = refiner.refine(domain, indicators, num, evalbasis, maxlevel=maxreflevel+uref, grid=grid, marker_type=None, select_type=None)
+            domain, grid, refined = refiner.refine(domain, indicators, num, evalbasis, maxlevel=maxrefine+uref, grid=grid, marker_type=None, select_type=None)
 
         if method == 'uniform':
 
