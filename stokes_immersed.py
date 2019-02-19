@@ -6,7 +6,7 @@ from matplotlib import collections
 
 def main(degree     = 3,
          uref       = 1,
-         refinements= 5,
+         refinements= 4,
          num        = 0.5,
          nelem      = 4,
          maxrefine  = 6,
@@ -17,7 +17,7 @@ def main(degree     = 3,
     rm = .2
     rc = .2
     M0 = .5
-    positions = [.5]
+    positions = [.4]
 
     methods = ['goaloriented','residualbased','uniform']
     methods = ['goaloriented']
@@ -147,9 +147,9 @@ def main(degree     = 3,
           dualtrail = solver.solve_linear('dualtrail', res.derivative('dualtest'))
           ns = ns(dualtrail=dualtrail) 
 
-          cons = domain.boundary['top,bottom,trimmed'].project(0, onto=ns.ubasis, geometry=geom, degree=degree*2)
-          ns.Iz   = domain.projection(ns.z, ns.ubasis, geometry=geom, degree=degree*2, constrain=cons)
-          ns.Is   = domain.projection(ns.s, ns.pbasis, geometry=geom, degree=degree*2)
+          #cons = domain.boundary['top,bottom,trimmed'].project(0, onto=ns.ubasis, geometry=geom, degree=degree*2)
+          ns.Iz   = domain.projection(ns.z, ns.ubasis, geometry=geom, degree=degree*2, droptol=0)
+          ns.Is   = domain.projection(ns.s, ns.pbasis, geometry=geom, degree=degree*2, droptol=0)
 
           ### Get errors ###
           nelems[method]       += [len(domain)]
@@ -174,15 +174,15 @@ def main(degree     = 3,
           z_int  = np.sqrt(indicater.integrate(domain, geom, degree, ns.zsharp, domain))
           s_int  = np.sqrt(indicater.integrate(domain, geom, degree, ns.ssharp, domain))
           ### Get indicaters ###
-    
-    
+
           ### Refine mesh ###
           if method == 'goaloriented':
 
               # assemble indicaters
               indicators = incom*s_int + force*z_int
 
-              plotter.plot_indicators('indicators_'+method+'_'+str(nref), domain, geom, {'indicator':indicators,'unweighted_indicators':incom+force,'weights':z_int+s_int}, normalize=False, alpha=.5)
+              plotter.plot_indicators('indicators_'+method+'_'+str(nref), domain, geom, {'momentum':force,'dualvelocity':z_int,'incompressibility':incom,'dualpressure':s_int}, normalize=False, alpha=.5)
+              plotter.plot_indicators('indicators_'+method+'_'+str(nref), domain, geom, {'indicator':indicators}, normalize=False, alpha=.5)
 
               domain, grid, refined = refiner.refine(domain, indicators, num, evalbasis, grid=grid, maxlevel=maxrefine+uref+1, select_type='same_level')
 

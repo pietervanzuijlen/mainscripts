@@ -10,7 +10,7 @@ def main(degree      = 3,
          maxuref     = 3,
          beta        = 50,):
 
-    positions = [.5]
+    positions = [.4]
     rc = 0.2
 
     methods = ['goaloriented','residualbased','uniform']
@@ -131,9 +131,9 @@ def main(degree      = 3,
           dualtrail = solver.solve_linear('dualtrail', res.derivative('dualtest'))
           ns = ns(dualtrail=dualtrail) 
 
-          cons = domain.boundary['top,bottom,corners,circle'].project(0, onto=ns.ubasis, geometry=geom, degree=degree*2)
-          ns.Iz   = domain.projection(ns.z, ns.ubasis, geometry=geom, degree=degree*2, constrain=cons)
-          ns.Is   = domain.projection(ns.s, ns.pbasis, geometry=geom, degree=degree*2)
+          #cons = domain.boundary['top,bottom,corners,circle'].project(0, onto=ns.ubasis, geometry=geom, degree=degree*2)
+          ns.Iz   = domain.projection(ns.z, ns.ubasis, geometry=geom, degree=degree*2, droptol=0)
+          ns.Is   = domain.projection(ns.s, ns.pbasis, geometry=geom, degree=degree*2, droptol=0)
           
           ### Get errors ###
           nelems[method]       += [len(domain)]
@@ -173,7 +173,8 @@ def main(degree      = 3,
 
               indicators =  inter + iface
 
-              plotter.plot_indicators('indicators_'+method+'_'+str(nref), domain, geom, {'indicator':indicators,'unweighted_indicators':incom+force+jump,'weights':z_int+s_int+z_jump}, normalize=False, alpha=.5)
+              plotter.plot_indicators('indicators_'+method+'_'+str(nref), domain, geom, {'momentum':force,'dualvelocity':z_int,'interface':jump,'dualjump':z_jump,'incompressibility':incom,'dualpressure':s_int}, normalize=False, alpha=.5)
+              plotter.plot_indicators('indicators_'+method+'_'+str(nref), domain, geom, {'indicator':indicators}, normalize=False, alpha=.5)
 
               domain, refined = refiner.refine(domain, indicators, num, evalbasis, maxlevel=maxrefine+uref+1, select_type='same_level')
 
