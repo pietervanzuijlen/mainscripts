@@ -7,8 +7,8 @@ import numpy as np
 from utilities import *
 
 def main(degree      = 2,
-         refinements = 5,
-         num         = 0.2,
+         refinements = 20,
+         num         = 0.5,
          uref        = 2,
          maxreflevel = 7,
          maxuref     = 3):
@@ -50,6 +50,7 @@ def main(degree      = 2,
 
             x, y = geom
             th = function.ArcTan2(y,x) 
+            #plotter.plot_solution('angle',domain,geom,th)
             R  = (x**2 + y**2)**.5
     
             #neumann BC
@@ -85,14 +86,14 @@ def main(degree      = 2,
         
             B = domain.integrate(ns.eval_ij('dualbasis_i,k dualbasis_j,k d:x'), degree=dualdegree*2)
 
-
             # single patch
             #Q = domain.boundary['bottom'].boundary['top'].integrate(ns.eval_i('dualbasis_i d:x'), degree=dualdegree*2)
             # multi patch
             Q = domain.boundary['bottom'].boundary['right'].integrate(ns.eval_i('dualbasis_i d:x'), degree=dualdegree*2)
+            # boundaries
+            #Q = domain.boundary['bottom,right,top,left'].integrate(ns.eval_i('dualbasis_i d:x'), degree=dualdegree*2)
             # mollification
             #Q = domain.integrate(ns.eval_i('k2 dualbasis_i d:x'), degree=dualdegree*2)
-
     
             consdual = domain.boundary['inner'].project(0, onto=ns.dualbasis, geometry=geom, degree=dualdegree*2)
         
@@ -149,8 +150,9 @@ def main(degree      = 2,
 
                 indicators =  inter + jump + bound 
 
-                plotter.plot_indicators('indicators_'+method+'_'+str(nref), domain, geom, {'indicator':indicators,'internal':inter,'interfaces':jump,'boundary':bound}, alpha=.5)
-                domain, refined = refiner.refine(domain, indicators, num, ns.basis, maxlevel=maxreflevel+uref+1, marker_type=None, select_type=None)
+                #plotter.plot_indicators('indicators_'+method+'_'+str(nref), domain, geom, {'indicator':indicators,'internal':inter,'interfaces':jump,'boundary':bound}, alpha=.5)
+                plotter.plot_indicators('indicators_'+method+'_'+str(nref), domain, geom, {'':indicators}, alpha=.5)
+                domain, refined = refiner.refine(domain, indicators, num, ns.basis, maxlevel=maxreflevel+uref+1, marker_type=None, select_type='same_level')
 
             if method == 'residualbased':
 
@@ -161,8 +163,9 @@ def main(degree      = 2,
 
                 indicators =  inter + jump + bound 
 
-                plotter.plot_indicators('indicators_'+method+'_'+str(nref), domain, geom, {'indicator':indicators,'internal':inter,'interfaces':jump,'boundary':bound}, alpha=.5)
-                domain, refined = refiner.refine(domain, indicators, num, ns.basis, maxlevel=maxreflevel+uref+1, marker_type=None, select_type=None)
+                #plotter.plot_indicators('indicators_'+method+'_'+str(nref), domain, geom, {'indicator':indicators,'internal':inter,'interfaces':jump,'boundary':bound}, alpha=.5)
+                plotter.plot_indicators('indicators_'+method+'_'+str(nref), domain, geom, {'':indicators}, alpha=.5)
+                domain, refined = refiner.refine(domain, indicators, num, ns.basis, maxlevel=maxreflevel+uref+1, marker_type=None, select_type='same_level')
 
             if method == 'uniform':
 
@@ -177,21 +180,21 @@ def main(degree      = 2,
             ### Refine mesh ###
 
         ### Postprocessing ###
-        plotter.plot_mesh(method+'mesh', domain, geom)
-        plotter.plot_solution(method+'dualsolution', domain, geom, ns.z)
-        plotter.plot_solution(method+'solution', domain, geom, ns.u)
+        plotter.plot_mesh(method+'mesh', domain, geom, cmap='Greys', color=0)
     
         writer.write('../results/laplace/'+method+'mollification', {'degree':degree, 'uref':uref, 'maxuref':maxuref, 'refinements':refinements, 'num':num},
                      ndofs=ndofs, nelems=nelems, error_sol=error_sol, error_qoi=error_qoi)
 
+
+    plotter.plot_solution(method+'dualsolution', domain, geom, ns.z)
+    plotter.plot_solution(method+'solution', domain, geom, ns.u)
     plotter.plot_convergence('Exact_error',ndofs,error_sol,labels=['dofs','Exact error'],slopemarker=True)
     plotter.plot_convergence('Exact_error_elemsize',elemsize,error_sol,labels=['1/h','Exact error'])
     plotter.plot_convergence('Error_est_QoI',ndofs,error_qoi_est,labels=['dofs','Error estimate'])
     plotter.plot_convergence('Error_in_QoI',ndofs,error_qoi,labels=['dofs','Error in QoI'],slopemarker=True)
     plotter.plot_convergence('Dofs_vs_elems',nelems,ndofs,labels=['nelems','ndofs'])
-        ### Postprocessing ###
 
-    #anouncer.drum()
+        ### Postprocessing ###
 
 with config(verbose=3,nprocs=6):
     cli.run(main)

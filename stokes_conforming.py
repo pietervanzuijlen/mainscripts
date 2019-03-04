@@ -6,7 +6,7 @@ def main(degree      = 3,
          uref        = 0,
          refinements = 4,
          num         = 0.5,
-         maxrefine   = 6,
+         maxrefine   = 4,
          maxuref     = 3,
          beta        = 50,):
 
@@ -176,7 +176,7 @@ def main(degree      = 3,
               plotter.plot_indicators('indicators_'+method+'_'+str(nref), domain, geom, {'momentum':force,'dualvelocity':z_int,'interface':jump,'dualjump':z_jump,'incompressibility':incom,'dualpressure':s_int}, normalize=False, alpha=.5)
               plotter.plot_indicators('indicators_'+method+'_'+str(nref), domain, geom, {'indicator':indicators}, normalize=False, alpha=.5)
 
-              domain, refined = refiner.refine(domain, indicators, num, evalbasis, maxlevel=maxrefine+uref+1, select_type='same_level')
+              domain, refined = refiner.refine(domain, indicators, num, evalbasis, maxlevel=maxrefine+uref-1, select_type='same_level')
 
           if method == 'residualbased':
 
@@ -188,7 +188,7 @@ def main(degree      = 3,
 
               plotter.plot_indicators('indicators_'+method+'_'+str(nref), domain, geom, {'indicator':indicators,'incompressibility':incom*h,'momentum':force*h,'interfaces':iface}, normalize=False, alpha=.5)
               
-              domain, refined = refiner.refine(domain, indicators, num, evalbasis, maxlevel=maxrefine+uref+1, select_type='same_level')
+              domain, refined = refiner.refine(domain, indicators, num, evalbasis, maxlevel=maxrefine+uref-1, select_type='same_level')
 
           if method == 'uniform':
 

@@ -9,7 +9,7 @@ def main(degree     = 3,
          refinements= 4,
          num        = 0.5,
          nelem      = 4,
-         maxrefine  = 6,
+         maxrefine  = 4,
          maxuref    = 3,
          beta       = 14.,):
 
@@ -62,21 +62,24 @@ def main(degree     = 3,
           ######################
        
           # Define bases
-          ns.ubasis, ns.pbasis, ns.lbasis= function.chain([domain.basis('th-spline', degree=degree, continuity=degree-2).vector(2),
-                                                           domain.basis('th-spline', degree=degree-1, continuity=degree-2),
-                                                           [1,]])
+          #ns.ubasis, ns.pbasis, ns.lbasis= function.chain([domain.basis('th-spline', degree=degree, continuity=degree-2).vector(2),
+          #                                                 domain.basis('th-spline', degree=degree-1, continuity=degree-2),
+          #                                                 [1,]])
+
+          ns.ubasis, ns.pbasis = function.chain([domain.basis('th-spline', degree=degree, continuity=degree-2).vector(2),
+                                                           domain.basis('th-spline', degree=degree-1, continuity=degree-2)])
           # Evaluation basis
           evalbasis = domain.basis('th-spline', degree=degree, continuity=degree-1)
           
           # Trail functions
           ns.u_i = 'ubasis_ni ?trail_n'
           ns.p = 'pbasis_n ?trail_n'
-          ns.ltrail = 'lbasis_n ?trail_n'
+          #ns.ltrail = 'lbasis_n ?trail_n'
     
           # Test functions
           ns.v_i = 'ubasis_ni ?test_n'
           ns.q = 'pbasis_n ?test_n'
-          ns.ltest = 'lbasis_n ?test_n'
+          #ns.ltest = 'lbasis_n ?test_n'
     
           # Stress
           ns.stress_ij = 'mu (u_i,j + u_j,i) - p δ_ij'
@@ -97,9 +100,10 @@ def main(degree     = 3,
     
           # Defining the residual
           res = domain.integral('(-stress_ij v_i,j + q u_l,l) d:x' @ ns, degree=degree*2)
-          res += domain.integral('(- ltest p - ltrail q ) d:x' @ ns, degree=degree*2)
+          #res += domain.integral('(- ltest p - ltrail q ) d:x' @ ns, degree=degree*2)
           res += domain.boundary['top,bottom,trimmed'].integral('noslip d:x' @ns, degree=degree*2)
-          res += domain.boundary['left,right'].integral('inflow d:x' @ns, degree=degree*2)
+          #res += domain.boundary['left,right'].integral('inflow d:x' @ns, degree=degree*2)
+          res += domain.boundary['left'].integral('inflow d:x' @ns, degree=degree*2)
                   
           # Solving the primal solution
           trail = solver.solve_linear('trail', res.derivative('test'))
@@ -111,19 +115,22 @@ def main(degree     = 3,
 
           dualdegree = degree + 1
 
-          ns.zbasis, ns.sbasis, ns.lbasis= function.chain([domain.basis('th-spline', degree=dualdegree, continuity=dualdegree-2).vector(2),
-                                                               domain.basis('th-spline', degree=dualdegree-1, continuity=dualdegree-2),
-                                                               [1,]])
+          #ns.zbasis, ns.sbasis, ns.lbasis= function.chain([domain.basis('th-spline', degree=dualdegree, continuity=dualdegree-2).vector(2),
+          #                                                     domain.basis('th-spline', degree=dualdegree-1, continuity=dualdegree-2),
+          #                                                     [1,]])
+
+          ns.zbasis, ns.sbasis = function.chain([domain.basis('th-spline', degree=dualdegree, continuity=dualdegree-2).vector(2),
+                                                               domain.basis('th-spline', degree=dualdegree-1, continuity=dualdegree-2)])
     
           # Trail functions
           ns.z_i = 'zbasis_ni ?dualtrail_n'
           ns.s = 'sbasis_n ?dualtrail_n'
-          ns.ltrail = 'lbasis_n ?dualtrail_n'
+          #ns.ltrail = 'lbasis_n ?dualtrail_n'
           
           # Test functions
           ns.v_i = 'zbasis_ni ?dualtest_n'
           ns.q = 'sbasis_n ?dualtest_n'
-          ns.ltest = 'lbasis_n ?dualtest_n'
+          #ns.ltest = 'lbasis_n ?dualtest_n'
     
           # Stress
           ns.dualstress_ij = 'mu (z_i,j + z_j,i) - s δ_ij'
@@ -139,10 +146,11 @@ def main(degree     = 3,
           ns.noslip  = 'mu ( (z_i,j + z_j,i) n_i) v_j + mu ( (v_i,j + v_j,i) n_i ) z_j - mu (beta / he) v_i z_i - s v_i n_i - q z_i n_i'
           ns.inflow  = 'mu ( (z_i,j + z_j,i) n_i) v_j + mu ( (v_i,j + v_j,i) n_i ) (z_j - uin_j) - mu (beta / he) v_i (z_i - uin_i) - s v_i n_i - q (z_i - uin_i) n_i'
     
-          res = domain.integral('(-dualstress_ij v_i,j + q z_l,l) d:x' @ ns, degree=degree*2)
-          res += domain.integral('(- ltest s - ltrail q ) d:x' @ ns, degree=degree*2)
+          res = domain.boundary['right'].integral('v_i n_i d:x' @ ns, degree=degree*2)
+          res += domain.integral('(-dualstress_ij v_i,j + q z_l,l) d:x' @ ns, degree=degree*2)
+          #res += domain.integral('(- ltest s - ltrail q ) d:x' @ ns, degree=degree*2)
           res += domain.boundary['top,bottom,trimmed'].integral('noslip d:x' @ns, degree=degree*2)
-          res += domain.boundary['left,right'].integral('inflow d:x' @ns, degree=degree*2)
+          #res += domain.boundary['left,right'].integral('inflow d:x' @ns, degree=degree*2)
     
           dualtrail = solver.solve_linear('dualtrail', res.derivative('dualtest'))
           ns = ns(dualtrail=dualtrail) 
@@ -184,7 +192,7 @@ def main(degree     = 3,
               plotter.plot_indicators('indicators_'+method+'_'+str(nref), domain, geom, {'momentum':force,'dualvelocity':z_int,'incompressibility':incom,'dualpressure':s_int}, normalize=False, alpha=.5)
               plotter.plot_indicators('indicators_'+method+'_'+str(nref), domain, geom, {'indicator':indicators}, normalize=False, alpha=.5)
 
-              domain, grid, refined = refiner.refine(domain, indicators, num, evalbasis, grid=grid, maxlevel=maxrefine+uref+1, select_type='same_level')
+              domain, grid, refined = refiner.refine(domain, indicators, num, evalbasis, grid=grid, maxlevel=maxrefine+uref-1, select_type='same_level')
 
           if method == 'residualbased':
 
@@ -193,7 +201,7 @@ def main(degree     = 3,
 
               plotter.plot_indicators('indicators_'+method+'_'+str(nref), domain, geom, {'indicator':indicators,'incompressibility':incom*h,'momentum':force*h}, normalize=False, alpha=.5)
               
-              domain, grid, refined = refiner.refine(domain, indicators, num, evalbasis, grid=grid, maxlevel=maxrefine+uref+1, select_type='same_level')
+              domain, grid, refined = refiner.refine(domain, indicators, num, evalbasis, grid=grid, maxlevel=maxrefine+uref-1, select_type='same_level')
 
           if method == 'uniform':
 
