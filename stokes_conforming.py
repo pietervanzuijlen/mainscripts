@@ -4,17 +4,17 @@ import numpy as np
 
 def main(degree      = 3,
          uref        = 0,
-         refinements = 4,
+         refinements = 10,
          num         = 0.5,
          maxrefine   = 4,
          maxuref     = 3,
-         beta        = 50,):
+         beta        = 500,):
 
-    positions = [.4]
+    positions = [.5,.4]
     rc = 0.2
 
     methods = ['goaloriented','residualbased','uniform']
-    methods = ['goaloriented']
+    #methods = ['uniform']
     
 
     for M1 in positions:
@@ -47,9 +47,8 @@ def main(degree      = 3,
           ######################
 
           # Define bases
-          ns.ubasis, ns.pbasis, ns.lbasis= function.chain([domain.basis('th-spline', degree=degree, patchcontinuous=True, continuity=degree-2).vector(2),
-                                                               domain.basis('th-spline', degree=degree-1, patchcontinuous=True, continuity=degree-2),
-                                                               [1,]])
+          ns.ubasis, ns.pbasis = function.chain([domain.basis('th-spline', degree=degree, patchcontinuous=True, continuity=degree-2).vector(2),
+                                                               domain.basis('th-spline', degree=degree-1, patchcontinuous=True, continuity=degree-2)])
     
           # Evaluation basis 
           evalbasis = domain.basis('th-spline', degree=degree)
@@ -57,12 +56,10 @@ def main(degree      = 3,
           # Trail functions
           ns.u_i = 'ubasis_ni ?trail_n'
           ns.p = 'pbasis_n ?trail_n'
-          ns.ltrail = 'lbasis_n ?trail_n'
           
           # Test functions
           ns.v_i = 'ubasis_ni ?test_n'
           ns.q = 'pbasis_n ?test_n'
-          ns.ltest = 'lbasis_n ?test_n'
     
           # Stress
           ns.stress_ij = 'mu (u_i,j + u_j,i) - p δ_ij'
@@ -82,9 +79,8 @@ def main(degree      = 3,
           ns.inflow  = 'mu ( (u_i,j + u_j,i) n_i) v_j + mu ( (v_i,j + v_j,i) n_i ) (u_j - uin_j) - mu (beta / he) v_i (u_i - uin_i) - p v_i n_i - q (u_i - uin_i) n_i'
     
           res = domain.integral('(-stress_ij v_i,j + q u_l,l) d:x' @ ns, degree=degree*2)
-          res += domain.integral('(- ltest p - ltrail q ) d:x' @ ns, degree=degree*2)
           res += domain.boundary['top,bottom,corners,circle'].integral('noslip d:x' @ns, degree=degree*2)
-          res += domain.boundary['left,right'].integral('inflow d:x' @ns, degree=degree*2)
+          res += domain.boundary['left'].integral('inflow d:x' @ns, degree=degree*2)
     
           trail = solver.solve_linear('trail', res.derivative('test'))
           ns = ns(trail=trail) 
@@ -95,19 +91,16 @@ def main(degree      = 3,
 
           dualdegree = degree + 1
 
-          ns.zbasis, ns.sbasis, ns.lbasis= function.chain([domain.basis('th-spline', degree=dualdegree, patchcontinuous=True, continuity=dualdegree-2).vector(2),
-                                                               domain.basis('th-spline', degree=dualdegree-1, patchcontinuous=True, continuity=dualdegree-2),
-                                                               [1,]])
+          ns.zbasis, ns.sbasis = function.chain([domain.basis('th-spline', degree=dualdegree, patchcontinuous=True, continuity=dualdegree-2).vector(2),
+                                                               domain.basis('th-spline', degree=dualdegree-1, patchcontinuous=True, continuity=dualdegree-2)])
     
           # Trail functions
           ns.z_i = 'zbasis_ni ?dualtrail_n'
           ns.s = 'sbasis_n ?dualtrail_n'
-          ns.ltrail = 'lbasis_n ?dualtrail_n'
           
           # Test functions
           ns.v_i = 'zbasis_ni ?dualtest_n'
           ns.q = 'sbasis_n ?dualtest_n'
-          ns.ltest = 'lbasis_n ?dualtest_n'
     
           # Stress
           ns.dualstress_ij = 'mu (z_i,j + z_j,i) - s δ_ij'
@@ -124,9 +117,8 @@ def main(degree      = 3,
           ns.inflow  = 'mu ( (z_i,j + z_j,i) n_i) v_j + mu ( (v_i,j + v_j,i) n_i ) (z_j - uin_j) - mu (beta / he) v_i (z_i - uin_i) - s v_i n_i - q (z_i - uin_i) n_i'
     
           res = domain.integral('(-dualstress_ij v_i,j + q z_l,l) d:x' @ ns, degree=degree*2)
-          res += domain.integral('(- ltest s - ltrail q ) d:x' @ ns, degree=degree*2)
           res += domain.boundary['top,bottom,corners,circle'].integral('noslip d:x' @ns, degree=degree*2)
-          res += domain.boundary['left,right'].integral('inflow d:x' @ns, degree=degree*2)
+          res += domain.boundary['left'].integral('v_i n_i d:x' @ns, degree=degree*2)
     
           dualtrail = solver.solve_linear('dualtrail', res.derivative('dualtest'))
           ns = ns(dualtrail=dualtrail) 
@@ -140,13 +132,14 @@ def main(degree      = 3,
           ndofs[method]        += [len(ns.ubasis)]
           error_force[method]  += [domain.integrate(function.norm2('stress_ij,i d:x' @ns), ischeme='gauss5')]
           error_incomp[method] += [domain.integrate(function.abs('u_i,i d:x' @ns), ischeme='gauss5')]
-          #error_qoi[method]    += [abs(domain.boundary['left'].integrate('g_i z_i d:x' @ ns, ischeme='gauss5')-domain.boundary['right'].integrate('n_i u_i d:x' @ ns, ischeme='gauss5'))]
+          error_qoi[method]    += [abs(domain.boundary['right'].integrate('n_i u_i d:x' @ ns, ischeme='gauss5'))]
           ### Get errors ###
     
     
           ### Get indicators ###
           ns.jump    = '[stress_ij] n_j [stress_il] n_l'
           ns.force   = 'stress_ij,j stress_il,l'
+          ns.outflow = '(stress_ij n_j) (stress_il n_l) '
           ns.zsharp  = '(z_i - Iz_i) (z_i - Iz_i)'
 
           ns.incom   = '(u_i,i)^2'
@@ -154,13 +147,15 @@ def main(degree      = 3,
 
           h = np.sqrt(indicater.integrate(domain, geom, degree, 1, domain))
 
-          incom  = np.sqrt(indicater.integrate(domain, geom, degree, ns.incom, domain))
-          force  = np.sqrt(indicater.integrate(domain, geom, degree, ns.force, domain))
-          jump   = np.sqrt(indicater.integrate(domain, geom, degree, ns.jump, domain.interfaces, interfaces=True))
+          incom   = np.sqrt(indicater.integrate(domain, geom, degree, ns.incom, domain))
+          force   = np.sqrt(indicater.integrate(domain, geom, degree, ns.force, domain))
+          outflow = np.sqrt(indicater.integrate(domain, geom, degree, ns.outflow, domain.boundary['right']))
+          jump    = np.sqrt(indicater.integrate(domain, geom, degree, ns.jump, domain.interfaces, interfaces=True))
     
-          z_int  = np.sqrt(indicater.integrate(domain, geom, degree, ns.zsharp, domain))
-          s_int  = np.sqrt(indicater.integrate(domain, geom, degree, ns.ssharp, domain))
-          z_jump = np.sqrt(indicater.integrate(domain, geom, degree, ns.zsharp, domain.interfaces, interfaces=True))
+          z_int     = np.sqrt(indicater.integrate(domain, geom, degree, ns.zsharp, domain))
+          s_int     = np.sqrt(indicater.integrate(domain, geom, degree, ns.ssharp, domain))
+          z_outflow = np.sqrt(indicater.integrate(domain, geom, degree, ns.zsharp, domain.boundary['right']))
+          z_jump    = np.sqrt(indicater.integrate(domain, geom, degree, ns.zsharp, domain.interfaces, interfaces=True))
           ### Get indicaters ###
     
     
@@ -170,10 +165,11 @@ def main(degree      = 3,
               # assemble indicaters
               inter = incom*s_int + force*z_int
               iface = jump*z_jump
+              bound = outflow*z_outflow
 
-              indicators =  inter + iface
+              indicators =  inter + iface + bound
 
-              plotter.plot_indicators('indicators_'+method+'_'+str(nref), domain, geom, {'momentum':force,'dualvelocity':z_int,'interface':jump,'dualjump':z_jump,'incompressibility':incom,'dualpressure':s_int}, normalize=False, alpha=.5)
+              plotter.plot_indicators('contributions_'+method+'_'+str(nref), domain, geom, {'momentum':force,'dualvelocity':z_int,'interface':jump,'dualjump':z_jump,'incompressibility':incom,'dualpressure':s_int,'outflow':outflow,'dualoutflow':z_outflow}, normalize=False, alpha=.5)
               plotter.plot_indicators('indicators_'+method+'_'+str(nref), domain, geom, {'indicator':indicators}, normalize=False, alpha=.5)
 
               domain, refined = refiner.refine(domain, indicators, num, evalbasis, maxlevel=maxrefine+uref-1, select_type='same_level')
@@ -183,10 +179,11 @@ def main(degree      = 3,
               # assemble indicaters
               inter = (incom + force)*h
               iface = jump*np.sqrt(h)
+              bound = outflow*np.sqrt(h)
 
-              indicators =  inter + iface
+              indicators =  inter + iface + bound
 
-              plotter.plot_indicators('indicators_'+method+'_'+str(nref), domain, geom, {'indicator':indicators,'incompressibility':incom*h,'momentum':force*h,'interfaces':iface}, normalize=False, alpha=.5)
+              plotter.plot_indicators('indicators_'+method+'_'+str(nref), domain, geom, {'indicator':indicators,'incompressibility':incom*h,'momentum':force*h,'interfaces':iface,'outflow':bound}, normalize=False, alpha=.5)
               
               domain, refined = refiner.refine(domain, indicators, num, evalbasis, maxlevel=maxrefine+uref-1, select_type='same_level')
 
@@ -210,7 +207,7 @@ def main(degree      = 3,
     
       plotter.plot_convergence('Estimated_error_force_'+str(M1),ndofs,error_force,labels=['dofs','Estimated error'],slopemarker=True)
       plotter.plot_convergence('Estimated_error_incomp_'+str(M1),ndofs,error_incomp,labels=['dofs','Estimated error'],slopemarker=True)
-      #plotter.plot_convergence('Estimated_error_QoI'+str(M1),ndofs,error_qoi,labels=['dofs','Estimated error'])
+      plotter.plot_convergence('Estimated_error_QoI'+str(M1),ndofs,error_qoi,labels=['dofs','Estimated error'])
 
 with config(verbose=3,nprocs=6):
     cli.run(main)
