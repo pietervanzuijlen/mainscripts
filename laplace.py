@@ -21,6 +21,8 @@ def main(degree      = 2,
     error_sol = {} 
     error_qoi = {} 
     error_qoi_est = {} 
+    sum_ind_res  = {}
+    sum_ind_goal = {}
 
     for method in methods:
 
@@ -30,6 +32,8 @@ def main(degree      = 2,
         error_sol[method] = []
         error_qoi[method] = []
         error_qoi_est[method] = []
+        sum_ind_res[method]  = []
+        sum_ind_goal[method] = []
         
         domain, geom = domainmaker.lshape(uref=3, width=2, height=2)
 
@@ -138,6 +142,9 @@ def main(degree      = 2,
             error_sol[method] += [np.sqrt(domain.integrate('(u - uh)^2 d:x' @ns, degree=10))]
             error_qoi[method] += [np.sqrt(domain.boundary['bottom'].boundary['right'].integrate('(u - uh)^2 d:x' @ ns , ischeme='gauss1'))]
             error_qoi_est[method] += [abs(domain.boundary['bottom'].boundary['right'].integrate('uh d:x' @ ns , ischeme='gauss5')-domain.boundary['left'].integrate('g1 z d:x' @ ns , ischeme='gauss5')-domain.boundary['top'].integrate('g2 z d:x' @ ns , ischeme='gauss5')-domain.boundary['right'].integrate('g3 z d:x' @ ns , ischeme='gauss5')-domain.boundary['bottom'].integrate('g4 z d:x' @ ns , ischeme='gauss5'))]
+
+            sum_ind_res[method] += [sum(rint*h + (rjump + rbound1 + rbound2 + rbound3 + rbound4) * np.sqrt(h))]
+            sum_ind_goal[method] += [sum(rint*rz_int + rjump*rz_jump + rbound1*rz_bound1 + rbound2*rz_bound2 + rbound3*rz_bound3 + rbound4*rz_bound4)]
             ### Get errors ###
 
             ### Refine mesh ###
@@ -183,7 +190,7 @@ def main(degree      = 2,
         plotter.plot_mesh(method+'mesh', domain, geom, cmap='Greys', color=0)
     
         writer.write('../results/laplace/'+method+'mollification', {'degree':degree, 'uref':uref, 'maxuref':maxuref, 'refinements':refinements, 'num':num},
-                     ndofs=ndofs, nelems=nelems, error_sol=error_sol, error_qoi=error_qoi)
+                     ndofs=ndofs, nelems=nelems, error_sol=error_sol, error_qoi=error_qoi, error_qoi_est=error_qoi_est, sum_ind_res=sum_ind_res, sum_ind_goal=sum_ind_goal)
 
 
     plotter.plot_solution(method+'dualsolution', domain, geom, ns.z)
